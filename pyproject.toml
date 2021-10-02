@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "ros_awsiot_agent"
+name = "ros_awsiot"
 version = "0.1.0"
 description = "This package provides bridge functionalities between ROS and AWS IoT"
 authors = ["seiya0412 <seiya.shimizu@whill.inc>"]
@@ -24,7 +24,7 @@ mypy_preset = "strict"
 line_length = 88
 py_version = "py36"
 [[tool.pysen.lint.mypy_targets]]
-  paths = ["./src/ros_awsiot_agent"]
+  paths = ["./ros_awsiot_agent/src/ros_awsiot_agent"]
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
