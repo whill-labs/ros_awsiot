@@ -1,0 +1,10 @@
+<launch>
+  <node pkg="ros_awsiot_agent" type="sample_shadow.py" name="named_shadow" output="screen" >
+    <rosparam command='load' file="$(find ros_awsiot_agent)/param/conn_param.yaml"/>
+    <rosparam command='load' file="$(find ros_awsiot_agent)/param/named_shadow.yaml"/>
+  </node>
+  <node pkg="ros_awsiot_agent" type="sample_shadow.py" name="classic_shadow" output="screen" >
+    <rosparam command='load' file="$(find ros_awsiot_agent)/param/conn_param.yaml"/>
+    <rosparam command='load' file="$(find ros_awsiot_agent)/param/classic_shadow.yaml"/>
+  </node>
+</launch>

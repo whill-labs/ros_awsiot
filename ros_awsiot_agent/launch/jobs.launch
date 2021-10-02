@@ -1,0 +1,7 @@
+<launch>
+  <node pkg="ros_awsiot_agent" type="sample_jobs.py" name="jobs2ros" output="screen" >
+    <rosparam command='load' file="$(find ros_awsiot_agent)/param/conn_param.yaml"/>
+    <param name="~topic_to" value="/jobs"/>
+    <param name="~topic_type" value="std_msgs/String"/>
+  </node>
+</launch>

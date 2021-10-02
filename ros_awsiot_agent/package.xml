@@ -1,0 +1,13 @@
+<?xml version="1.0"?>
+<package format="2">
+  <name>ros_awsiot_agent</name>
+  <version>0.0.0</version>
+  <description>This package provides bridge functionalities between ROS and AWS IoT</description>
+
+  <maintainer email="seiya.shimizu@whill.inc">Seiya Shimizu</maintainer>
+  <license>MIT</license>  
+
+  <buildtool_depend>catkin</buildtool_depend>
+  <depend>rospy</depend>
+  <depend>rosbridge_library</depend>
+</package>
