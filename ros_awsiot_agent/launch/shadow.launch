@@ -12,4 +12,11 @@
     <param name="~enable_downstream" value="True"/>
     <remap from="~output" to="downstream"/>
   </node>
+
+  <node pkg="ros_awsiot_agent" type="talker.py" name="talker" >
+    <remap from="chatter" to="upstream" />
+  </node>
+  <node pkg="ros_awsiot_agent" type="listener.py" name="listener" >
+    <remap from="chatter" to="downstream" />
+  </node>
 </launch>
