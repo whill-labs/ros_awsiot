@@ -2,6 +2,7 @@
 
 import logging
 from os.path import expanduser
+from typing import Any, Dict
 from uuid import uuid4
 
 import rospy
@@ -19,8 +20,8 @@ set_module_logger(modname="awsiotclient", level=logging.WARN)
 class ShadowParams:
     def __init__(
         self,
-        thing_name: str = None,
-        name: str = None,
+        thing_name: str = "",
+        name: str = "",
         enable_downstream: bool = False,
         enable_upstream: bool = True,
         publish_full_doc: bool = False,
@@ -102,25 +103,31 @@ class Ros2Shadow:
                 upstream_topic, upstream_topic_class, callback=self.callback
             )
 
-    def accept_delta(self, thing_name: str, shadow_name: str, value: dict):
-        rospy.logdebug("delta received")
+    def accept_delta(
+        self, thing_name: str, shadow_name: str, value: Dict[str, Any]
+    ) -> None:
+        rospy.logdebug(
+            f"delta received. thing_name:  {thing_name}, shadow_name: {shadow_name}"
+        )
         downstream_inst = self.downstream_topic_class()
         msg = populate_instance(value, downstream_inst)
         self.pub.publish(msg)
 
-    def deny_delta(self, thing_name: str, shadow_name: str, value: dict):
+    def deny_delta(
+        self, thing_name: str, shadow_name: str, value: Dict[str, Any]
+    ) -> None:
         raise (
             named_shadow.ExceptionAwsIotNamedShadowInvalidDelta(
                 "this shadow does not accept any delta"
             )
         )
 
-    def callback(self, msg):
+    def callback(self, msg: rospy.AnyMsg) -> None:
         msg_dict = extract_values(msg)
         self.shadow_cli.change_reported_value(msg_dict)
 
 
-def main():
+def main() -> None:
     rospy.init_node("ros2shadow", anonymous=True)
 
     shadow_params = ShadowParams()
@@ -154,7 +161,7 @@ def main():
     )
     conn_params.use_websocket = rospy.get_param("~use_websocket", default=False)
 
-    ros2shadow = Ros2Shadow(conn_params, shadow_params)
+    Ros2Shadow(conn_params, shadow_params)
     rospy.spin()
 
 

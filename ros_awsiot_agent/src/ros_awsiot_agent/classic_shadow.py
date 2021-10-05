@@ -2,6 +2,7 @@
 
 import logging
 from os.path import expanduser
+from typing import Any, Dict
 from uuid import uuid4
 
 import rospy
@@ -19,14 +20,16 @@ set_module_logger(modname="awsiotclient", level=logging.WARN)
 class ShadowParams:
     def __init__(
         self,
-        thing_name: str = None,
-        name: str = None,
-        accept_delta: bool = False,
+        thing_name: str = "",
+        name: str = "",
+        enable_downstream: bool = False,
+        enable_upstream: bool = True,
         publish_full_doc: bool = False,
     ) -> None:
         self.thing_name = thing_name
         self.name = name
-        self.accept_delta = accept_delta
+        self.enable_downstream = enable_downstream
+        self.enable_upstream = enable_upstream
         self.publish_full_doc = publish_full_doc
 
 
@@ -34,64 +37,103 @@ class Ros2Shadow:
     def __init__(
         self, conn_params: mqtt.ConnectionParams, shadow_params: ShadowParams
     ) -> None:
-        topic_from = rospy.remap_name("~input")
-        topic_to = rospy.remap_name("~output")
+        upstream_topic = rospy.resolve_name(rospy.remap_name("~input"))
+        downstream_topic = rospy.resolve_name(rospy.remap_name("~output"))
 
-        topic_class = None
-        while topic_class is None:
-            try:
-                topic_class, _, _ = get_topic_class(topic_from)
-                topic_type = get_topic_type(topic_from)
-                rospy.logdebug("ROS topic %s (%s) detected.", topic_from, topic_type)
-            except ROSTopicIOException as e:
-                rospy.logdebug(
-                    "ROS topic %s is not ready yet. %s raised.", topic_from, e
-                )
-            rospy.sleep(1.0)
-        self.inst = topic_class()
+        upstream_topic_class = None
+        if shadow_params.enable_upstream:
+            while upstream_topic_class is None:
+                try:
+                    upstream_topic_class, _, _ = get_topic_class(upstream_topic)
+                    upstream_topic_type = get_topic_type(upstream_topic)
+                    rospy.logdebug(
+                        "ROS topic %s (%s) detected.",
+                        upstream_topic,
+                        upstream_topic_type,
+                    )
+                except ROSTopicIOException as e:
+                    rospy.logdebug(
+                        "ROS topic %s is not ready yet. %s raised.", upstream_topic, e
+                    )
+                rospy.sleep(1.0)
+
+        downstream_topic_class = None
+        if shadow_params.enable_downstream:
+            while downstream_topic_class is None:
+                try:
+                    downstream_topic_class, _, _ = get_topic_class(downstream_topic)
+                    downstream_topic_type = get_topic_type(downstream_topic)
+                    rospy.logdebug(
+                        "ROS topic %s (%s) detected.",
+                        downstream_topic,
+                        downstream_topic_type,
+                    )
+                except ROSTopicIOException as e:
+                    rospy.logdebug(
+                        "ROS topic %s is not ready yet. %s raised.", downstream_topic, e
+                    )
+                rospy.sleep(1.0)
+
         self.mqtt_connection = mqtt.init(conn_params)
         connect_future = self.mqtt_connection.connect()
         connect_future.result()
         rospy.logdebug("Connected!")
 
-        if shadow_params.accept_delta:
+        # Publisher must be initialized before delta_func is registerd to shadow client
+        if downstream_topic_class:
+            self.pub = rospy.Publisher(
+                downstream_topic, downstream_topic_class, queue_size=10
+            )
+            self.downstream_topic_class = downstream_topic_class
             delta_func = self.accept_delta
         else:
             delta_func = self.deny_delta
 
         self.shadow_cli = classic_shadow.client(
             self.mqtt_connection,
-            thing_name=conn_params.thing_name,
-            shadow_property=shadow_params.name,
+            thing_name=shadow_params.thing_name,
+            shadow_name=shadow_params.name,
             delta_func=delta_func,
+            publish_full_doc=shadow_params.publish_full_doc,
         )
-        self.sub = rospy.Subscriber(topic_from, topic_class, callback=self.callback)
-        self.pub = rospy.Publisher(topic_to, topic_class, queue_size=10)
 
-    def accept_delta(self, thing_name: str, shadow_name: str, value: dict):
-        msg = populate_instance(value, self.inst)
+        # Subscriber must be initialized after shadow client gets ready
+        if upstream_topic_class:
+            self.sub = rospy.Subscriber(
+                upstream_topic, upstream_topic_class, callback=self.callback
+            )
+
+    def accept_delta(
+        self, thing_name: str, shadow_name: str, value: Dict[str, Any]
+    ) -> None:
+        msg = populate_instance(value, self.downstream_topic_class())
         self.pub.publish(msg)
 
-    def deny_delta(self, thing_name: str, shadow_name: str, value: dict):
+    def deny_delta(
+        self, thing_name: str, shadow_name: str, value: Dict[str, Any]
+    ) -> None:
         raise (
             classic_shadow.ExceptionAwsIotClassicShadowInvalidDelta(
                 "this shadow does not accept any delta"
             )
         )
 
-    def callback(self, msg):
+    def callback(self, msg: rospy.AnyMsg) -> None:
         msg_dict = extract_values(msg)
         self.shadow_cli.change_reported_value(msg_dict)
 
 
-def main():
+def main() -> None:
     rospy.init_node("ros2shadow", anonymous=True)
 
     shadow_params = ShadowParams()
     shadow_params.thing_name = rospy.get_param("~thing_name")
     shadow_params.name = rospy.get_param("~shadow_name")
     shadow_params.publish_full_doc = rospy.get_param("~publish_full_doc", default=False)
-    shadow_params.accept_delta = rospy.get_param("~accept_delta", default=False)
+    shadow_params.enable_downstream = rospy.get_param(
+        "~enable_downstream", default=False
+    )
+    shadow_params.enable_upstream = rospy.get_param("~enable_upstream", default=True)
 
     conn_params = mqtt.ConnectionParams()
 
@@ -115,7 +157,7 @@ def main():
     )
     conn_params.use_websocket = rospy.get_param("~use_websocket", default=False)
 
-    ros2shadow = Ros2Shadow(conn_params, shadow_params)
+    Ros2Shadow(conn_params, shadow_params)
     rospy.spin()
 
 

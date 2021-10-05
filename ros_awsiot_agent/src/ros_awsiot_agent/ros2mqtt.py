@@ -18,7 +18,10 @@ class Ros2Mqtt:
         self, topic_from: str, topic_to: str, conn_params: mqtt.ConnectionParams
     ) -> None:
         topic_class = None
-        while topic_class is None:
+        now = rospy.Time.now()
+        timeout = rospy.Duration.from_sec(60.0)
+        timediff = rospy.Duration.from_sec(0.0)
+        while topic_class is None and timediff < timeout:  # type: ignore
             try:
                 topic_class, _, _ = get_topic_class(topic_from)
                 topic_type = get_topic_type(topic_from)
@@ -28,7 +31,8 @@ class Ros2Mqtt:
                     "ROS topic %s is not ready yet. %s raised.", topic_from, e
                 )
             rospy.sleep(1.0)
-        self.inst = topic_class()
+            timediff = rospy.Time.now() - now
+
         self.mqtt_connection = mqtt.init(conn_params)
         connect_future = self.mqtt_connection.connect()
         connect_future.result()
@@ -37,12 +41,12 @@ class Ros2Mqtt:
         self.mqtt_pub = pubsub.Publisher(self.mqtt_connection, topic_to)
         self.sub = rospy.Subscriber(topic_from, topic_class, callback=self.callback)
 
-    def callback(self, msg):
+    def callback(self, msg: rospy.AnyMsg) -> None:
         msg_dict = extract_values(msg)
         self.mqtt_pub.publish(msg_dict)
 
 
-def main():
+def main() -> None:
     rospy.init_node("ros2mqtt", anonymous=True)
 
     topic_from = rospy.get_param("~topic_from", default="~input")
@@ -61,7 +65,6 @@ def main():
     )
 
     conn_params.endpoint = rospy.get_param("~endpoint")
-    thing_name = rospy.get_param("~thing_name", default="NOT-A-THING")
 
     conn_params.client_id = rospy.get_param(
         "~client_id", default="ros2mqtt-" + str(uuid4())
@@ -71,7 +74,7 @@ def main():
     )
     conn_params.use_websocket = rospy.get_param("~use_websocket", default=False)
 
-    ros2mqtt = Ros2Mqtt(topic_from, topic_to, conn_params)
+    Ros2Mqtt(topic_from, topic_to, conn_params)
     rospy.spin()
 
 
