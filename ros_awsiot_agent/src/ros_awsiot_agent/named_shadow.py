@@ -156,10 +156,13 @@ def main() -> None:
     conn_params.client_id = rospy.get_param(
         "~client_id", default=shadow_params.thing_name + "-" + str(uuid4())
     )
-    conn_params.signing_region = rospy.get_param(
-        "~signing_region", default="ap-northeast-1"
-    )
-    conn_params.use_websocket = rospy.get_param("~use_websocket", default=False)
+
+    # Note: signing_region and use_websocket parameters haven't been tested.
+
+    # conn_params.signing_region = rospy.get_param(
+    #     "~signing_region", default="ap-northeast-1"
+    # )
+    # conn_params.use_websocket = rospy.get_param("~use_websocket", default=False)
 
     Ros2Shadow(conn_params, shadow_params)
     rospy.spin()
