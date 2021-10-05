@@ -79,7 +79,7 @@ class Ros2Shadow:
         connect_future.result()
         rospy.logdebug("Connected!")
 
-        # Publisher must be initialized before delta_func is registerd to shadow client
+        # Publisher must be initialized before delta_func is registered to shadow client
         if downstream_topic_class:
             self.pub = rospy.Publisher(
                 downstream_topic, downstream_topic_class, queue_size=10
