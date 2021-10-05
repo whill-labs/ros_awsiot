@@ -1,10 +1,22 @@
 <launch>
-  <node pkg="ros_awsiot_agent" type="sample_shadow.py" name="named_shadow" output="screen" >
-    <rosparam command='load' file="$(find ros_awsiot_agent)/param/conn_param.yaml"/>
-    <rosparam command='load' file="$(find ros_awsiot_agent)/param/named_shadow.yaml"/>
+  <node pkg="ros_awsiot_agent" type="named_shadow.py" name="named_shadow" output="screen" >
+    <param name="~endpoint" value="$(env AWSIOT_ENDPOINT)"/>
+    <param name="~thing_name" value="$(env AWSIOT_THING_NAME)"/>
+    <param name="~root_ca" value="/.aws/AmazonRootCA1.pem"/>
+    <param name="~cert" value="/.aws/certificate.pem.crt"/>
+    <param name="~key" value="/.aws/private.pem.key"/>
+    <param name="~shadow_name" value="test"/>
+    <param name="~publish_full_doc" value="True"/>
+    <param name="~enable_upstream" value="True"/>
+    <remap from="~input" to="upstream"/>
+    <param name="~enable_downstream" value="True"/>
+    <remap from="~output" to="downstream"/>
   </node>
-  <node pkg="ros_awsiot_agent" type="sample_shadow.py" name="classic_shadow" output="screen" >
-    <rosparam command='load' file="$(find ros_awsiot_agent)/param/conn_param.yaml"/>
-    <rosparam command='load' file="$(find ros_awsiot_agent)/param/classic_shadow.yaml"/>
+
+  <node pkg="ros_awsiot_agent" type="talker.py" name="talker" >
+    <remap from="chatter" to="upstream" />
+  </node>
+  <node pkg="ros_awsiot_agent" type="listener.py" name="listener" output="screen">
+    <remap from="chatter" to="downstream" />
   </node>
 </launch>

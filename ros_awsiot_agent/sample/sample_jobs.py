@@ -4,7 +4,7 @@ from os.path import expanduser
 from uuid import uuid4
 
 import rospy
-from awsiotclient import *
+from awsiotclient import jobs, mqtt
 from rosbridge_library.internal.message_conversion import (
     extract_values,
     populate_instance,
@@ -101,7 +101,7 @@ def main():
     )
     conn_params.use_websocket = rospy.get_param("~use_websocket", default=False)
 
-    jobs2ros = Jobs2Ros(topic_type, conn_params, job_params)
+    Jobs2Ros(topic_type, conn_params, job_params)
 
     rospy.spin()
 

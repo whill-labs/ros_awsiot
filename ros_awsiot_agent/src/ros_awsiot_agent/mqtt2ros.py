@@ -2,6 +2,7 @@
 
 import logging
 from os.path import expanduser
+from typing import Any, Dict
 from uuid import uuid4
 
 import rospy
@@ -34,12 +35,12 @@ class Mqtt2Ros:
             self.mqtt_connection, topic_from, callback=self.callback
         )
 
-    def callback(self, topic, msg_dict, **kwargs):
+    def callback(self, topic: str, msg_dict: Dict[str, Any]) -> None:
         msg = populate_instance(msg_dict, self.inst)
         self.pub.publish(msg)
 
 
-def main():
+def main() -> None:
     rospy.init_node("mqtt2ros", anonymous=True)
 
     topic_to = rospy.get_param("~topic_to", default="~output")
@@ -59,7 +60,6 @@ def main():
     )
 
     conn_params.endpoint = rospy.get_param("~endpoint")
-    thing_name = rospy.get_param("~thing_name", default="NOT-A-THING")
 
     conn_params.client_id = rospy.get_param(
         "~client_id", default="mqtt-" + str(uuid4())
@@ -69,7 +69,7 @@ def main():
     )
     conn_params.use_websocket = rospy.get_param("~use_websocket", default=False)
 
-    mqtt2ros = Mqtt2Ros(topic_from, topic_to, topic_type, conn_params)
+    Mqtt2Ros(topic_from, topic_to, topic_type, conn_params)
     rospy.spin()
 
 

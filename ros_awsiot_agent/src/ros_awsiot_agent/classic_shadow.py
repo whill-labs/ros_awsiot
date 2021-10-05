@@ -6,7 +6,7 @@ from typing import Any, Dict
 from uuid import uuid4
 
 import rospy
-from awsiotclient import mqtt, named_shadow
+from awsiotclient import classic_shadow, mqtt
 from ros_awsiot_agent import set_module_logger
 from rosbridge_library.internal.message_conversion import (
     extract_values,
@@ -79,7 +79,7 @@ class Ros2Shadow:
         connect_future.result()
         rospy.logdebug("Connected!")
 
-        # Publisher must be initialized before delta_func is registerd to shadow client
+        # Publisher must be initialized before delta_func is registered to shadow client
         if downstream_topic_class:
             self.pub = rospy.Publisher(
                 downstream_topic, downstream_topic_class, queue_size=10
@@ -89,7 +89,7 @@ class Ros2Shadow:
         else:
             delta_func = self.deny_delta
 
-        self.shadow_cli = named_shadow.client(
+        self.shadow_cli = classic_shadow.client(
             self.mqtt_connection,
             thing_name=shadow_params.thing_name,
             shadow_name=shadow_params.name,
@@ -106,18 +106,14 @@ class Ros2Shadow:
     def accept_delta(
         self, thing_name: str, shadow_name: str, value: Dict[str, Any]
     ) -> None:
-        rospy.logdebug(
-            f"delta received. thing_name:  {thing_name}, shadow_name: {shadow_name}"
-        )
-        downstream_inst = self.downstream_topic_class()
-        msg = populate_instance(value, downstream_inst)
+        msg = populate_instance(value, self.downstream_topic_class())
         self.pub.publish(msg)
 
     def deny_delta(
         self, thing_name: str, shadow_name: str, value: Dict[str, Any]
     ) -> None:
         raise (
-            named_shadow.ExceptionAwsIotNamedShadowInvalidDelta(
+            classic_shadow.ExceptionAwsIotClassicShadowInvalidDelta(
                 "this shadow does not accept any delta"
             )
         )
