@@ -16,7 +16,7 @@
   <node pkg="ros_awsiot_agent" type="talker.py" name="talker" >
     <remap from="chatter" to="upstream" />
   </node>
-  <node pkg="ros_awsiot_agent" type="listener.py" name="listener" >
+  <node pkg="ros_awsiot_agent" type="listener.py" name="listener" output="screen">
     <remap from="chatter" to="downstream" />
   </node>
 </launch>
