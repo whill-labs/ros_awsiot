@@ -5,6 +5,7 @@ This package provides bridge functionalities between ROS and AWS IoT.
 ## Requirements
 
 - python3.6+
+- ROS Noetic
 - [awsiotclient 0.1.1+](https://pypi.org/project/awsiotclient/) (Note: awsiotclient cannot be installed via `rosdep install`. Install the package via pip.)
 
 ## Usage
