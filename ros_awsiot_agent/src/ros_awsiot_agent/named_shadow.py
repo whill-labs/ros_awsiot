@@ -145,7 +145,7 @@ def main() -> None:
     shadow_params.thing_name = rospy.get_param("~thing_name")
     shadow_params.name = rospy.get_param("~shadow_name")
     shadow_params.publish_full_doc = rospy.get_param("~publish_full_doc", default=False)
-    shadow_params.use_desired_as_downstream = rospy.get_param("~use_desired_as_downstream", default=False)
+    shadow_params.use_desired_as_downstream = rospy.get_param("~use_desired_as_downstream", default=True)
     shadow_params.enable_downstream = rospy.get_param(
         "~enable_downstream", default=False
     )
