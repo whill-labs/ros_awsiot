@@ -25,7 +25,7 @@ class ShadowParams:
         enable_downstream: bool = False,
         enable_upstream: bool = True,
         publish_full_doc: bool = False,
-        use_desired_as_downstream: bool = False,
+        use_desired_as_downstream: bool = True,
     ) -> None:
         self.thing_name = thing_name
         self.name = name
