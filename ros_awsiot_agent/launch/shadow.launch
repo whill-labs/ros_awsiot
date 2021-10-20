@@ -7,6 +7,7 @@
     <param name="~key" value="/.aws/private.pem.key"/>
     <param name="~shadow_name" value="test"/>
     <param name="~publish_full_doc" value="True"/>
+    <param name="~use_desired_in_delta_func" value="True"/>
     <param name="~enable_upstream" value="True"/>
     <remap from="~input" to="upstream"/>
     <param name="~enable_downstream" value="True"/>
