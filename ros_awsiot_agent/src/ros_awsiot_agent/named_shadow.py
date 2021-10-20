@@ -25,12 +25,14 @@ class ShadowParams:
         enable_downstream: bool = False,
         enable_upstream: bool = True,
         publish_full_doc: bool = False,
+        use_desired_in_delta_func: bool = False,
     ) -> None:
         self.thing_name = thing_name
         self.name = name
         self.enable_downstream = enable_downstream
         self.enable_upstream = enable_upstream
         self.publish_full_doc = publish_full_doc
+        self.use_desired_in_delta_func = use_desired_in_delta_func
 
 
 class Ros2Shadow:
@@ -95,6 +97,7 @@ class Ros2Shadow:
             shadow_name=shadow_params.name,
             delta_func=delta_func,
             publish_full_doc=shadow_params.publish_full_doc,
+            use_desired_in_delta_func=shadow_params.use_desired_in_delta_func,
         )
 
         # Subscriber must be initialized after shadow client gets ready
@@ -134,6 +137,7 @@ def main() -> None:
     shadow_params.thing_name = rospy.get_param("~thing_name")
     shadow_params.name = rospy.get_param("~shadow_name")
     shadow_params.publish_full_doc = rospy.get_param("~publish_full_doc", default=False)
+    shadow_params.use_desired_in_delta_func = rospy.get_param("~use_desired_in_delta_func", default=False)
     shadow_params.enable_downstream = rospy.get_param(
         "~enable_downstream", default=False
     )
