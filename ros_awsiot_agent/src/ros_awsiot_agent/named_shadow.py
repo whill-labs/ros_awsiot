@@ -25,12 +25,14 @@ class ShadowParams:
         enable_downstream: bool = False,
         enable_upstream: bool = True,
         publish_full_doc: bool = False,
+        use_desired_as_downstream: bool = True,
     ) -> None:
         self.thing_name = thing_name
         self.name = name
         self.enable_downstream = enable_downstream
         self.enable_upstream = enable_upstream
         self.publish_full_doc = publish_full_doc
+        self.use_desired_as_downstream = use_desired_as_downstream
 
 
 class Ros2Shadow:
@@ -93,9 +95,15 @@ class Ros2Shadow:
             self.mqtt_connection,
             thing_name=shadow_params.thing_name,
             shadow_name=shadow_params.name,
-            delta_func=delta_func,
             publish_full_doc=shadow_params.publish_full_doc,
         )
+
+        if shadow_params.use_desired_as_downstream:
+            rospy.logdebug("use desired")
+            self.shadow_cli.desired_func = delta_func
+        else:
+            rospy.logdebug("use delta")
+            self.shadow_cli.delta_func = delta_func
 
         # Subscriber must be initialized after shadow client gets ready
         if upstream_topic_class:
@@ -107,7 +115,10 @@ class Ros2Shadow:
         self, thing_name: str, shadow_name: str, value: Dict[str, Any]
     ) -> None:
         rospy.logdebug(
-            f"delta received. thing_name:  {thing_name}, shadow_name: {shadow_name}"
+            f"cb invoked. thing_name: {thing_name}, shadow_name: {shadow_name}"
+        )
+        rospy.logdebug(
+            f"value: {value}"
         )
         downstream_inst = self.downstream_topic_class()
         msg = populate_instance(value, downstream_inst)
@@ -134,6 +145,7 @@ def main() -> None:
     shadow_params.thing_name = rospy.get_param("~thing_name")
     shadow_params.name = rospy.get_param("~shadow_name")
     shadow_params.publish_full_doc = rospy.get_param("~publish_full_doc", default=False)
+    shadow_params.use_desired_as_downstream = rospy.get_param("~use_desired_as_downstream", default=True)
     shadow_params.enable_downstream = rospy.get_param(
         "~enable_downstream", default=False
     )
