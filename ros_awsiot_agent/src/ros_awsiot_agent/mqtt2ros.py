@@ -36,7 +36,11 @@ class Mqtt2Ros:
         )
 
     def callback(self, topic: str, msg_dict: Dict[str, Any]) -> None:
-        msg = populate_instance(msg_dict, self.inst)
+        out = dict()
+        for k, v in msg_dict.items():
+            if k in dir(self.inst):
+                out[k] = v
+        msg = populate_instance(out, self.inst)
         self.pub.publish(msg)
 
 
