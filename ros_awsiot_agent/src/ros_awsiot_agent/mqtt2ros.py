@@ -5,15 +5,10 @@ from os.path import expanduser
 from typing import Any, Dict
 from uuid import uuid4
 
-from matplotlib.pyplot import get
-
 import rospy
 from awsiotclient import mqtt, pubsub
 from ros_awsiot_agent import set_module_logger
-from rosbridge_library.internal.message_conversion import populate_instance
 from rosbridge_library.internal.ros_loader import get_message_class
-
-import time
 
 set_module_logger(modname="awsiotclient", level=logging.WARN)
 
