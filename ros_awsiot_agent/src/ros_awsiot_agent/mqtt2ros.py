@@ -8,8 +8,9 @@ from uuid import uuid4
 import rospy
 from awsiotclient import mqtt, pubsub
 from ros_awsiot_agent import set_module_logger
-from rosbridge_library.internal.message_conversion import populate_instance
 from rosbridge_library.internal.ros_loader import get_message_class
+
+from message_conversion import populate_instance
 
 set_module_logger(modname="awsiotclient", level=logging.WARN)
 
