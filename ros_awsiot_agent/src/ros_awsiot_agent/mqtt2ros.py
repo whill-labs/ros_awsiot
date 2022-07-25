@@ -5,11 +5,15 @@ from os.path import expanduser
 from typing import Any, Dict
 from uuid import uuid4
 
+from matplotlib.pyplot import get
+
 import rospy
 from awsiotclient import mqtt, pubsub
 from ros_awsiot_agent import set_module_logger
 from rosbridge_library.internal.message_conversion import populate_instance
 from rosbridge_library.internal.ros_loader import get_message_class
+
+import time
 
 set_module_logger(modname="awsiotclient", level=logging.WARN)
 
@@ -36,12 +40,20 @@ class Mqtt2Ros:
         )
 
     def callback(self, topic: str, msg_dict: Dict[str, Any]) -> None:
-        out = dict()
-        for k, v in msg_dict.items():
-            if k in dir(self.inst):
-                out[k] = v
-        msg = populate_instance(out, self.inst)
-        self.pub.publish(msg)
+        mag_msg = self.convert_dict_to_attr(msg_dict, self.inst)
+        # rospy.loginfo(mag_msg)
+        self.pub.publish(mag_msg)
+
+    def convert_dict_to_attr(self, d: Dict[str, Any], obj: Any) -> Any:
+        for k, v in d.items():
+            if k in obj.__slots__:
+                if type(v) == dict:
+                    setattr(obj, k, self.convert_dict_to_attr(v, getattr(obj, k)))
+                # elif type(v) == list:
+                    # setattr(obj, k, v[0: len(getattr(obj, k))])
+                else:
+                    setattr(obj, k, v)
+        return obj
 
 
 def main() -> None:
