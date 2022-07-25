@@ -35,10 +35,10 @@ class Mqtt2Ros:
         )
 
     def callback(self, topic: str, msg_dict: Dict[str, Any]) -> None:
-        mag_msg = self.convert_dict_to_attr(msg_dict, self.inst)
+        mag_msg = self.convert_dict_to_obj(msg_dict, self.inst)
         self.pub.publish(mag_msg)
 
-    def convert_dict_to_attr(self, d: Dict[str, Any], obj: Any) -> Any:
+    def convert_dict_to_obj(self, d: Dict[str, Any], obj: Any) -> Any:
         for k, v in d.items():
             if k in obj.__slots__:
                 if type(v) == dict:
