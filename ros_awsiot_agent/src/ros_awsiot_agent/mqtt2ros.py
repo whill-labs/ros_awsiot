@@ -42,7 +42,7 @@ class Mqtt2Ros:
         for k, v in d.items():
             if k in obj.__slots__:
                 if type(v) == dict:
-                    setattr(obj, k, self.convert_dict_to_attr(v, getattr(obj, k)))
+                    setattr(obj, k, self.convert_dict_to_obj(v, getattr(obj, k)))
                 else:
                     setattr(obj, k, v)
         return obj
