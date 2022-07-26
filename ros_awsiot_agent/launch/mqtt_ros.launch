@@ -1,0 +1,22 @@
+<launch>
+  <arg name="endpoint" value="$(env AWSIOT_ENDPOINT)"/>
+  <arg name="thing_name" value="$(env AWSIOT_THING_NAME)"/>
+  <arg name="root_ca" default="~/.aws/cert_root/AmazonRootCA1.pem" />
+  <arg name="cert" default="~/.aws/certificate.pem.crt" />
+  <arg name="key" default="~/.aws/private.pem.key" />
+
+  <node pkg="ros_awsiot_agent" type="mqtt2ros.py" name="mqtt2ros" required="true" output="screen">
+    <param name="endpoint" value="$(arg endpoint)"/>
+    <param name="thing_name" value="$(arg thing_name)"/>
+    <param name="client_id" value="$(arg thing_name)"/>
+    <param name="root_ca" value="$(arg root_ca)"/>
+    <param name="cert" value="$(arg cert)"/>
+    <param name="key" value="$(arg key)"/>
+    <param name="topic_from" value="whill/things/$(arg thing_name)/test"/>
+    <param name="topic_to" value="test_topic"/>
+    <!-- <param name="topic_type" value="sensor_msgs/Temperature"/> -->
+    <!-- <param name="topic_type" value="sensor_msgs/MagneticField"/> -->
+    <param name="topic_type" value="sensor_msgs/MultiEchoLaserScan"/>
+  </node>
+
+</launch>
