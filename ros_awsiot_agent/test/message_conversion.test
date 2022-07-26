@@ -1,0 +1,3 @@
+<launch>
+  <test test-name="test_message_conversion" pkg="ros_awsiot_agent" type="test_message_conversion.py" />
+</launch>
