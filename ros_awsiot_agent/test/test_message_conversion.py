@@ -9,7 +9,7 @@ from io import BytesIO as StringIO
 
 from src.ros_awsiot_agent import message_conversion as c
 from rosbridge_library.internal import ros_loader
-from base64 import standard_b64encode, standard_b64decode
+from base64 import standard_b64encode
 
 if sys.version_info >= (3, 0):
     string_types = (str,)
@@ -238,7 +238,6 @@ class TestMessageConversion(unittest.TestCase):
             inst = ros_loader.get_message_instance(rostype)
             msg = c.extract_values(inst)
             self.do_test(msg, rostype)
-            l = loads(dumps(msg))
             inst2 = ros_loader.get_message_instance(rostype)
             c.populate_instance(msg, inst2)
             self.assertEqual(inst, inst2)
