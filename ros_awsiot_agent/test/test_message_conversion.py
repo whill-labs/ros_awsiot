@@ -5,12 +5,7 @@ import rospy
 import rosunit
 import unittest
 from json import loads, dumps
-
-try:
-    from cStringIO import StringIO  # Python 2.x
-except ImportError:
-    from io import BytesIO as StringIO  # Python 3.x
-
+from io import BytesIO as StringIO
 
 from src.ros_awsiot_agent import message_conversion as c
 from rosbridge_library.internal import ros_loader
