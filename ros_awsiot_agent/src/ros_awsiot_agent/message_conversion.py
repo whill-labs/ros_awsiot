@@ -37,9 +37,9 @@ import rospy
 from rosbridge_library.internal import ros_loader
 
 import re
-from base64 import standard_b64encode, standard_b64decode
+from base64 import standard_b64decode
 
-from rosbridge_library.util import string_types, bson
+from rosbridge_library.util import string_types
 
 
 type_map = {
@@ -89,7 +89,6 @@ ros_binary_types_list_braces = [
     ("uint8[]", re.compile(r"uint8\[[^\]]*\]")),
     ("char[]", re.compile(r"char\[[^\]]*\]")),
 ]
-
 
 
 class FieldTypeMismatchException(Exception):
@@ -143,12 +142,12 @@ def _to_binary_inst(msg):
     if type(msg) in string_types:
         try:
             return standard_b64decode(msg)
-        except:
+        except TypeError:
             return msg
     else:
         try:
             return bytes(bytearray(msg))
-        except:
+        except TypeError:
             return msg
 
 
@@ -192,7 +191,7 @@ def _to_list_inst(msg, rostype, roottype, inst, stack):
         raise FieldTypeMismatchException(roottype, stack, rostype, type(msg))
 
     # Can duck out early if the list is empty
-    if len(msg) == 0:
+    if not msg:
         return []
 
     # Remove the list indicators from the rostype
@@ -224,7 +223,7 @@ def _to_object_inst(msg, rostype, roottype, inst, stack):
         field_stack = stack + [field_name]
 
         # pass the field if the msg contains a bad field
-        if not field_name in inst_fields:
+        if field_name not in inst_fields:
             continue
 
         field_rostype = inst_fields[field_name]
