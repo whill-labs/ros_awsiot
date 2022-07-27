@@ -242,39 +242,34 @@ class TestMessageConversion(unittest.TestCase):
             c.populate_instance(msg, inst2)
             self.assertEqual(inst, inst2)
 
-    def test_unexpected_key_in_dict_1(self):
+    def test_unexpected_key_in_dict1(self):
         rostype = "nav_msgs/GridCells"
         inst = ros_loader.get_message_instance(rostype)
         inst.cells = [ros_loader.get_message_instance("geometry_msgs/Point") for i in range(100)]
 
         msg = c.extract_values(inst)
         self.do_test(msg, rostype)
-        msg_w_extra_key = msg
-        msg_w_extra_key["unexpected_key"] = "unexpected_val"
-        for i in range(100):
-            msg_w_extra_key["cells"][i]["unexpected_key"] = "unexpected_val"
+        msg["unexpected_key"] = "unexpected_val"
 
         inst2 = ros_loader.get_message_instance(rostype)
-        c.populate_instance(msg_w_extra_key, inst2)
+        c.populate_instance(msg, inst2)
         self.assertEqual(inst, inst2)
 
-    def test_unexpected_key_in_dict_2(self):
-        rostype = "sensor_msgs/PointCloud2"
+    def test_unexpected_key_in_dict2(self):
+        rostype = "nav_msgs/GridCells"
         inst = ros_loader.get_message_instance(rostype)
-        inst.fields = [ros_loader.get_message_instance("sensor_msgs/PointField") for i in range(100)]
+        inst.cells = [ros_loader.get_message_instance("geometry_msgs/Point") for i in range(100)]
 
         msg = c.extract_values(inst)
         self.do_test(msg, rostype)
-        msg_w_extra_key = msg
-        msg_w_extra_key["unexpected_key"] = "unexpected_val"
-        for i in range(100):
-            msg_w_extra_key["fields"][i]["unexpected_key"] = "unexpected_val"
+        msg["unexpected_key"] = dict()
+        msg["unexpected_key"]["unexpected_key"] = "unexpected_val"
 
         inst2 = ros_loader.get_message_instance(rostype)
-        c.populate_instance(msg_w_extra_key, inst2)
+        c.populate_instance(msg, inst2)
         self.assertEqual(inst, inst2)
 
-    def test_unexpected_key_in_dict_3(self):
+    def test_unexpected_key_in_list_in_dict(self):
         rostype = "visualization_msgs/InteractiveMarkerUpdate"
         inst = ros_loader.get_message_instance(rostype)
         inst.markers = [ros_loader.get_message_instance("visualization_msgs/InteractiveMarker") for i in range(100)]
@@ -282,14 +277,12 @@ class TestMessageConversion(unittest.TestCase):
 
         msg = c.extract_values(inst)
         self.do_test(msg, rostype)
-        msg_w_extra_key = msg
-        msg_w_extra_key["unexpected_key"] = "unexpected_val"
         for i in range(100):
-            msg_w_extra_key["markers"][i]["unexpected_key"] = "unexpected_val"
-            msg_w_extra_key["poses"][i]["unexpected_key"] = "unexpected_val"
+            msg["markers"][i]["unexpected_key"] = "unexpected_val"
+            msg["poses"][i]["unexpected_key"] = "unexpected_val"
 
         inst2 = ros_loader.get_message_instance(rostype)
-        c.populate_instance(msg_w_extra_key, inst2)
+        c.populate_instance(msg, inst2)
         self.assertEqual(inst, inst2)
 
     def test_int8array(self):
