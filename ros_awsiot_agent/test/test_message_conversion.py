@@ -256,14 +256,12 @@ class TestMessageConversion(unittest.TestCase):
         self.assertEqual(inst, inst2)
 
     def test_unexpected_key_in_dict2(self):
-        rostype = "nav_msgs/GridCells"
+        rostype = "actionlib_msgs/GoalStatus"
         inst = ros_loader.get_message_instance(rostype)
-        inst.cells = [ros_loader.get_message_instance("geometry_msgs/Point") for i in range(100)]
 
         msg = c.extract_values(inst)
         self.do_test(msg, rostype)
-        msg["unexpected_key"] = dict()
-        msg["unexpected_key"]["unexpected_key"] = "unexpected_val"
+        msg["goal_id"]["unexpected_key"] = "unexpected_val"
 
         inst2 = ros_loader.get_message_instance(rostype)
         c.populate_instance(msg, inst2)
