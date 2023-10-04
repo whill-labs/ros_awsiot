@@ -11,6 +11,7 @@
     <param name="~enable_upstream" value="True"/>
     <remap from="~input" to="upstream"/>
     <param name="~enable_downstream" value="True"/>
+    <param name="~qos" value="1"/>
     <remap from="~output" to="downstream"/>
   </node>
 
