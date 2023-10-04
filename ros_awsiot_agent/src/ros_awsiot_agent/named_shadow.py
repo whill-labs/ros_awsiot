@@ -13,6 +13,7 @@ from rosbridge_library.internal.message_conversion import (
     populate_instance,
 )
 from rostopic import ROSTopicIOException, get_topic_class, get_topic_type
+import awscrt.mqtt
 
 set_module_logger(modname="awsiotclient", level=logging.WARN)
 
@@ -26,6 +27,7 @@ class ShadowParams:
         enable_upstream: bool = True,
         publish_full_doc: bool = False,
         use_desired_as_downstream: bool = True,
+        qos: int = awscrt.mqtt.QoS.AT_LEAST_ONCE,
     ) -> None:
         self.thing_name = thing_name
         self.name = name
@@ -33,6 +35,7 @@ class ShadowParams:
         self.enable_upstream = enable_upstream
         self.publish_full_doc = publish_full_doc
         self.use_desired_as_downstream = use_desired_as_downstream
+        self.qos = qos
 
 
 class Ros2Shadow:
@@ -96,6 +99,7 @@ class Ros2Shadow:
             thing_name=shadow_params.thing_name,
             shadow_name=shadow_params.name,
             publish_full_doc=shadow_params.publish_full_doc,
+            qos=shadow_params.qos,
         )
 
         if shadow_params.use_desired_as_downstream:
@@ -150,6 +154,15 @@ def main() -> None:
         "~enable_downstream", default=False
     )
     shadow_params.enable_upstream = rospy.get_param("~enable_upstream", default=True)
+    shadow_params.qos = rospy.get_param("~qos", default=1)
+    if shadow_params.qos == 0:
+        shadow_params.qos = awscrt.mqtt.QoS.AT_MOST_ONCE
+    elif shadow_params.qos == 1:
+        shadow_params.qos = awscrt.mqtt.QoS.AT_LEAST_ONCE
+    # EXACTLY_ONCE is not supported by awsIot service yet (2020/May)
+    else:
+        rospy.logerr("invalid qos value: %d", shadow_params.qos)
+        exit(1)
 
     conn_params = mqtt.ConnectionParams()
 
