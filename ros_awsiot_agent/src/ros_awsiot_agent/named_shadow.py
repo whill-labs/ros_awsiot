@@ -14,6 +14,8 @@ from rosbridge_library.internal.message_conversion import (
 )
 from rostopic import ROSTopicIOException, get_topic_class, get_topic_type
 
+import awscrt.exceptions
+
 set_module_logger(modname="awsiotclient", level=logging.WARN)
 
 
@@ -26,6 +28,7 @@ class ShadowParams:
         enable_upstream: bool = True,
         publish_full_doc: bool = False,
         use_desired_as_downstream: bool = True,
+        retry_wait: int = 10,
     ) -> None:
         self.thing_name = thing_name
         self.name = name
@@ -33,6 +36,7 @@ class ShadowParams:
         self.enable_upstream = enable_upstream
         self.publish_full_doc = publish_full_doc
         self.use_desired_as_downstream = use_desired_as_downstream
+        self.retry_wait = retry_wait
 
 
 class Ros2Shadow:
@@ -77,9 +81,16 @@ class Ros2Shadow:
                 rospy.sleep(1.0)
 
         self.mqtt_connection = mqtt.init(conn_params)
-        connect_future = self.mqtt_connection.connect()
-        connect_future.result()
-        rospy.logdebug("Connected!")
+        connected = False
+        while not connected:
+            try:
+                connect_future = self.mqtt_connection.connect()
+                connect_future.result()
+                rospy.loginfo("Connected to AWS IoT!")
+                connected = True
+            except awscrt.exceptions.AwsCrtError as e:
+                rospy.logwarn("Connection attempt failed: {}, retrying in {} seconds...".format(e, shadow_params.retry_wait))
+                rospy.sleep(shadow_params.retry_wait)
 
         # Publisher must be initialized before delta_func is registerd to shadow client
         if downstream_topic_class:
@@ -150,6 +161,7 @@ def main() -> None:
         "~enable_downstream", default=False
     )
     shadow_params.enable_upstream = rospy.get_param("~enable_upstream", default=True)
+    shadow_params.retry_wait = rospy.get_param("~retry_wait", default=10)
 
     conn_params = mqtt.ConnectionParams()
 
