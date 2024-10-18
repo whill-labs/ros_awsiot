@@ -9,6 +9,7 @@ import rospy
 from awsiotclient import mqtt, pubsub
 from ros_awsiot_agent import set_module_logger
 from rosbridge_library.internal.ros_loader import get_message_class
+import awscrt.exceptions
 
 from message_conversion import populate_instance
 
@@ -22,14 +23,22 @@ class Mqtt2Ros:
         topic_to: str,
         topic_type: str,
         conn_params: mqtt.ConnectionParams,
+        retry_wait: int,
     ) -> None:
         topic_class = get_message_class(topic_type)
         self.inst = topic_class()
         self.mqtt_connection = mqtt.init(conn_params)
-        connect_future = self.mqtt_connection.connect()
 
-        connect_future.result()
-        rospy.loginfo("Connected!")
+        connected = False
+        while not connected:
+            try:
+                connect_future = self.mqtt_connection.connect()
+                connect_future.result()
+                rospy.loginfo("Connected to AWS IoT!")
+                connected = True
+            except awscrt.exceptions.AwsCrtError as e:
+                rospy.logwarn("Connection attempt failed: {}, retrying in {} seconds...".format(e, retry_wait))
+                rospy.sleep(retry_wait)
 
         self.pub = rospy.Publisher(topic_to, topic_class, queue_size=10)
         self.mqtt_sub = pubsub.Subscriber(
@@ -47,6 +56,7 @@ def main() -> None:
     topic_to = rospy.get_param("~topic_to", default="~output")
     topic_from = rospy.get_param("~topic_from", default="/mqtt2ros")
     topic_type = rospy.get_param("~topic_type", default="std_msgs/String")
+    retry_wait = rospy.get_param("~retry_wait", default=10)
 
     conn_params = mqtt.ConnectionParams()
 
@@ -70,7 +80,7 @@ def main() -> None:
     )
     conn_params.use_websocket = rospy.get_param("~use_websocket", default=False)
 
-    Mqtt2Ros(topic_from, topic_to, topic_type, conn_params)
+    Mqtt2Ros(topic_from, topic_to, topic_type, conn_params, retry_wait)
     rospy.spin()
 
 
