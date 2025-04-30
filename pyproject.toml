@@ -2,12 +2,12 @@
 name = "ros_awsiot"
 version = "0.1.0"
 description = "This package provides bridge functionalities between ROS and AWS IoT"
-authors = ["seiya0412 <seiya.shimizu@whill.inc>"]
+authors = ["tadashi.imokawa <tad.imokawa@gmail.com>"]
 license = "MIT"
 
 [tool.poetry.dependencies]
-python = "^3.6"
-awsiotclient = "^0.1.1"
+python = "^3.7.1"
+awsiotclient = "^0.2.1"
 
 [tool.poetry.dev-dependencies]
 pysen = {version = "^0.9.1", extras = ["lint"]}

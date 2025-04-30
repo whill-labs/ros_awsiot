@@ -1,0 +1,120 @@
+#!/usr/bin/env python3
+
+import logging
+from os.path import expanduser
+from typing import Any, Dict
+from uuid import uuid4
+import time
+
+import rclpy
+from rclpy.node import Node
+from awsiotclient import mqtt, pubsub
+from ros_awsiot_agent import set_module_logger
+from rosidl_runtime_py.utilities import get_message
+import awscrt.exceptions
+
+from ros_awsiot_agent.message_conversion import populate_instance
+
+set_module_logger(modname="awsiotclient", level=logging.WARN)
+
+
+class Mqtt2Ros(Node):
+    def __init__(
+        self,
+        topic_from: str,
+        topic_to: str,
+        topic_type: str,
+        conn_params: mqtt.ConnectionParams,
+        retry_wait: int,
+    ) -> None:
+        super().__init__('mqtt2ros')
+
+        topic_class = get_message(topic_type)
+        self.inst = topic_class()
+        self.mqtt_connection = mqtt.init(conn_params)
+
+        connected = False
+        while not connected:
+            try:
+                connect_future = self.mqtt_connection.connect()
+                connect_future.result()
+                self.get_logger().info("Connected to AWS IoT!")
+                connected = True
+            except awscrt.exceptions.AwsCrtError as e:
+                self.get_logger().warn(
+                    f"Connection attempt failed: {e}, retrying in {retry_wait} seconds...")
+                time.sleep(retry_wait)
+
+        # ROS2形式のパブリッシャー作成
+        self.pub = self.create_publisher(topic_class, topic_to, 10)
+        self.mqtt_sub = pubsub.Subscriber(
+            self.mqtt_connection, topic_from, callback=self.callback
+        )
+
+    def callback(self, topic: str, msg_dict: Dict[str, Any]) -> None:
+        self.get_logger().debug(f"Received message: {msg_dict}")
+        msg = populate_instance(msg_dict, self.inst)
+        self.pub.publish(msg)
+
+
+def main(args=None) -> None:
+    rclpy.init(args=args)
+
+    # ROS2ノードを作成
+    node = rclpy.create_node('mqtt2ros_param_node')
+
+    # ROS2形式のパラメータ宣言と取得
+    node.declare_parameter('topic_to', 'output')
+    node.declare_parameter('topic_from', '/mqtt2ros')
+    node.declare_parameter('topic_type', 'std_msgs/String')
+    node.declare_parameter('retry_wait', 10)
+
+    topic_to = node.get_parameter('topic_to').value
+    topic_from = node.get_parameter('topic_from').value
+    topic_type = node.get_parameter('topic_type').value
+    retry_wait = node.get_parameter('retry_wait').value
+
+    if topic_type is None:
+        node.get_logger().error("topic_type is not specified")
+        node.destroy_node()
+        rclpy.shutdown()
+        return
+
+    # 証明書関連のパラメータ
+    node.declare_parameter('cert', '~/.aws/cert/certificate.pem.crt')
+    node.declare_parameter('key', '~/.aws/cert/private.pem.key')
+    node.declare_parameter('root_ca', '~/.aws/cert/AmazonRootCA1.pem')
+    node.declare_parameter('endpoint', '')
+    node.declare_parameter('client_id', 'mqtt-' + str(uuid4()))
+    node.declare_parameter('signing_region', 'ap-northeast-1')
+    node.declare_parameter('use_websocket', False)
+
+    conn_params = mqtt.ConnectionParams()
+    conn_params.cert = expanduser(node.get_parameter('cert').value)
+    conn_params.key = expanduser(node.get_parameter('key').value)
+    conn_params.root_ca = expanduser(node.get_parameter('root_ca').value)
+    conn_params.endpoint = node.get_parameter('endpoint').value
+    conn_params.client_id = node.get_parameter('client_id').value
+    conn_params.signing_region = node.get_parameter('signing_region').value
+    conn_params.use_websocket = node.get_parameter('use_websocket').value
+
+    node.destroy_node()
+
+    mqtt2ros_node = Mqtt2Ros(
+        topic_from,
+        topic_to,
+        topic_type,
+        conn_params,
+        retry_wait)
+
+    try:
+        rclpy.spin(mqtt2ros_node)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        mqtt2ros_node.destroy_node()
+        rclpy.shutdown()
+
+
+if __name__ == "__main__":
+    main()

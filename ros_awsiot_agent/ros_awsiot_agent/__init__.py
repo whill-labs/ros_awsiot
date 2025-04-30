@@ -12,7 +12,8 @@ def set_module_logger(
     logger = logging.getLogger(modname)
     handler = logging.StreamHandler()
     handler.setFormatter(
-        logging.Formatter("[%(asctime)s][%(name)s][%(levelname)s]: %(message)s")
+        logging.Formatter(
+            "[%(asctime)s][%(name)s][%(levelname)s]: %(message)s")
     )
     logger.addHandler(handler)
     logger.setLevel(level)
