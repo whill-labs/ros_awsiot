@@ -6,15 +6,17 @@ from os.path import expanduser
 from typing import Any, Dict
 from uuid import uuid4
 
+from awsiotclient import mqtt, named_shadow
+import awscrt.exceptions
 import rclpy
 from rclpy.node import Node
-from awsiotclient import mqtt, named_shadow
 from ros_awsiot_agent import set_module_logger
 from rosbridge_library.internal.message_conversion import (
     extract_values,
     populate_instance,
 )
-import awscrt.exceptions
+from ros2topic.api import get_msg_class
+
 
 set_module_logger(modname="awsiotclient", level=logging.WARN)
 
@@ -48,13 +50,15 @@ class Ros2Shadow(Node):
         # Declare parameters
         self.declare_parameter('input_topic', '/input')
         self.declare_parameter('output_topic', '/output')
-        self.declare_parameter('input_topic_type', 'std_msgs/String')
         self.declare_parameter('output_topic_type', 'std_msgs/String')
 
         upstream_topic = self.get_parameter('input_topic').value
         downstream_topic = self.get_parameter('output_topic').value
-        upstream_topic_type = self.get_parameter('input_topic_type').value
         downstream_topic_type = self.get_parameter('output_topic_type').value
+
+        upstream_topic_type = get_msg_class(
+            self, upstream_topic, blocking=True)
+        self.get_logger().info(f"upstream_topic_type: {upstream_topic_type}")
 
         upstream_topic_class = None
         if shadow_params.enable_upstream:
@@ -84,7 +88,7 @@ class Ros2Shadow(Node):
                     f"Connection attempt failed: {e}, retrying in {shadow_params.retry_wait} seconds...")
                 time.sleep(shadow_params.retry_wait)
 
-        # Publisherの初期化
+        # Initialize Publisher
         if downstream_topic_class:
             self.pub = self.create_publisher(
                 downstream_topic_class,
@@ -110,7 +114,7 @@ class Ros2Shadow(Node):
             self.get_logger().debug("use delta")
             self.shadow_cli.delta_func = delta_func
 
-        # Subscriberの初期化
+        # Initialize Subscriber
         if upstream_topic_class:
             self.sub = self.create_subscription(
                 upstream_topic_class,
@@ -142,44 +146,56 @@ class Ros2Shadow(Node):
             return None
 
     # Helper method to import message type
-    def import_message_type(self, type_str):
+    def import_message_type(self, type_info):
         """
-        Dynamically imports Python class from string message type format
+        Process message type and return appropriate class
 
-        Examples:
-        - 'std_msgs/String' -> std_msgs.String
-        - 'geometry_msgs/Twist' -> geometry_msgs.Twist
-        - 'sensor_msgs/Image' -> sensor_msgs.Image
+        Args:
+            type_info: String type name ('std_msgs/String' etc.) or already imported message class
 
-        In ROS2, message types typically follow the format 'package_name/MessageType'.
+        Returns:
+            Message class, or None if failed
         """
         try:
-            # Handle 'package_name/MessageType' formats
-            parts = type_str.split('/')
+            # If already a class object, return as is
+            if isinstance(type_info, type):
+                self.get_logger().debug(
+                    f"Message class directly passed: {type_info.__module__}.{type_info.__name__}")
+                return type_info
 
-            # If there are 2 parts, it's in the 'package_name/MessageType'
-            if len(parts) == 2:
-                package_name = parts[0]
-                msg_type = parts[1]
-                module_name = f"{package_name}.msg"
-            else:
-                self.get_logger().error(
-                    f"Invalid message type format: {type_str}")
-                return None
+            # If string format, process traditionally
+            if isinstance(type_info, str):
+                # Handle 'package_name/MessageType' formats
+                parts = type_info.split('/')
 
-            # Import the module and get the class
-            self.get_logger().debug(
-                f"Import attempt: module={module_name}, class={msg_type}")
-            module = __import__(module_name, fromlist=[msg_type])
-            message_class = getattr(module, msg_type)
+                # If there are 2 parts, it's in the 'package_name/MessageType'
+                if len(parts) == 2:
+                    package_name = parts[0]
+                    msg_type = parts[1]
+                    module_name = f"{package_name}.msg"
+                else:
+                    self.get_logger().error(
+                        f"Invalid message type format: {type_info}")
+                    return None
 
-            self.get_logger().debug(
-                f"Successfully imported message class {type_str}")
-            return message_class
+                # Import the module and get the class
+                self.get_logger().debug(
+                    f"Import attempt: module={module_name}, class={msg_type}")
+                module = __import__(module_name, fromlist=[msg_type])
+                message_class = getattr(module, msg_type)
+
+                self.get_logger().debug(
+                    f"Successfully imported message class {type_info}")
+                return message_class
+
+            # If neither class nor string, error
+            self.get_logger().error(
+                f"Invalid message type format: {type(type_info)} {type_info}")
+            return None
 
         except (ImportError, AttributeError) as e:
             self.get_logger().error(
-                f"Error occurred while importing message type {type_str}: {e}")
+                f"Error occurred while importing message type {type_info}: {e}")
             # More detailed debug information
             import traceback
             self.get_logger().debug(traceback.format_exc())

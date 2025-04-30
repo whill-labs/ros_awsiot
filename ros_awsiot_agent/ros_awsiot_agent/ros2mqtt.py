@@ -14,6 +14,7 @@ import awscrt.exceptions
 from ros_awsiot_agent import set_module_logger
 from ros_awsiot_agent.message_conversion import extract_values
 from rclpy.callback_groups import ReentrantCallbackGroup
+from ros2topic.api import get_msg_class
 
 set_module_logger(modname="awsiotclient", level=logging.DEBUG)
 
@@ -71,28 +72,12 @@ def main(args=None) -> None:
     node.declare_parameter('client_id', f'ros2mqtt-{str(uuid4())}')
     node.declare_parameter('signing_region', 'ap-northeast-1')
     node.declare_parameter('use_websocket', False)
-    node.declare_parameter('topic_type', '')
 
     topic_from = node.get_parameter('topic_from').value
     topic_to = node.get_parameter('topic_to').value
-    topic_type_str = node.get_parameter('topic_type').value
 
-    if topic_type_str:
-        try:
-            module_name, class_name = topic_type_str.split('/')
-            module = __import__(
-                f'{module_name}.msg', fromlist=[class_name])
-            msg_type = getattr(module, class_name)
-
-            node.get_logger().info(
-                f"ROS topic {topic_from} ({topic_type_str}) detected.")
-        except (ImportError, AttributeError, ValueError) as e:
-            node.get_logger().error(
-                f"Failed to import message type {topic_type_str}: {e}")
-            node.destroy_node()
-            rclpy.shutdown()
-            return
-    else:
+    msg_type = get_msg_class(node, topic_from, blocking=True)
+    if msg_type is None:
         node.get_logger().error(
             f"Could not determine message type for {topic_from} after {timeout} seconds")
         node.destroy_node()

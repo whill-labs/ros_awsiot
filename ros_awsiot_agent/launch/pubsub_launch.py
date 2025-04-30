@@ -18,7 +18,6 @@ def generate_launch_description():
         parameters=[
             {'topic_from': '/input'},
             {'topic_to': EnvironmentVariable('AWSIOT_MQTT_TOPIC')},
-            {'topic_type': 'std_msgs/String'},
             {'cert': PathJoinSubstitution(
                 [EnvironmentVariable('AWSIOT_CERT_DIR'), 'certificate.pem.crt'])},
             {'key': PathJoinSubstitution(

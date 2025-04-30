@@ -43,7 +43,6 @@ def generate_launch_description():
                 'enable_downstream': True,
                 'input_topic': 'upstream',
                 'output_topic': 'downstream',
-                'input_topic_type': 'std_msgs/String',
                 'output_topic_type': 'std_msgs/String',
             }],
         ),
