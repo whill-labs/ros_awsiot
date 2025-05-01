@@ -28,7 +28,8 @@ def generate_launch_description():
             {'client_id': [EnvironmentVariable(
                 'AWSIOT_THING_NAME'), TextSubstitution(text='-ros2mqtt')]},
             {'signing_region': 'ap-northeast-1'},
-            {'use_websocket': False}
+            {'use_websocket': False},
+            {'use_gzip_compression': True}
         ]
     )
 
@@ -52,7 +53,8 @@ def generate_launch_description():
             {'client_id': [EnvironmentVariable(
                 'AWSIOT_THING_NAME'), TextSubstitution(text='-mqtt2ros')]},
             {'signing_region': 'ap-northeast-1'},
-            {'use_websocket': False}
+            {'use_websocket': False},
+            {'use_gzip_compression': True}
         ]
     )
 

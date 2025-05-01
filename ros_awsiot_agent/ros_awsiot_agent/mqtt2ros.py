@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 
 import logging
+import gzip
+import json
 from os.path import expanduser
 from typing import Any, Dict
 from uuid import uuid4
@@ -12,7 +14,7 @@ from awsiotclient import mqtt, pubsub
 from ros_awsiot_agent import set_module_logger
 from rosidl_runtime_py.utilities import get_message
 import awscrt.exceptions
-
+from awscrt.mqtt import QoS
 from ros_awsiot_agent.message_conversion import populate_instance
 
 set_module_logger(modname="awsiotclient", level=logging.WARN)
@@ -26,6 +28,7 @@ class Mqtt2Ros(Node):
         topic_type: str,
         conn_params: mqtt.ConnectionParams,
         retry_wait: int,
+        use_gzip_compression: bool
     ) -> None:
         super().__init__('mqtt2ros')
 
@@ -45,14 +48,25 @@ class Mqtt2Ros(Node):
                     f"Connection attempt failed: {e}, retrying in {retry_wait} seconds...")
                 time.sleep(retry_wait)
 
-        # ROS2形式のパブリッシャー作成
+        # create ROS2 publisher
         self.pub = self.create_publisher(topic_class, topic_to, 10)
-        self.mqtt_sub = pubsub.Subscriber(
-            self.mqtt_connection, topic_from, callback=self.callback
-        )
+        if use_gzip_compression:
+            self.mqtt_sub = self.mqtt_connection.subscribe(
+                topic_from, callback=self.callback_gzip_compression, qos=QoS.AT_LEAST_ONCE
+            )
+        else:
+            self.mqtt_sub = pubsub.Subscriber(
+                self.mqtt_connection, topic_from, callback=self.callback
+            )
 
     def callback(self, topic: str, msg_dict: Dict[str, Any]) -> None:
-        self.get_logger().debug(f"Received message: {msg_dict}")
+        self.get_logger().info(f"Received message: {msg_dict}")
+        msg = populate_instance(msg_dict, self.inst)
+        self.pub.publish(msg)
+
+    def callback_gzip_compression(self, topic: str, payload: bytes) -> None:
+        self.get_logger().info(f"Received gzip compressed message: {payload}")
+        msg_dict = json.loads(gzip.decompress(payload).decode('utf-8'))
         msg = populate_instance(msg_dict, self.inst)
         self.pub.publish(msg)
 
@@ -60,27 +74,25 @@ class Mqtt2Ros(Node):
 def main(args=None) -> None:
     rclpy.init(args=args)
 
-    # ROS2ノードを作成
     node = rclpy.create_node('mqtt2ros_param_node')
 
-    # ROS2形式のパラメータ宣言と取得
     node.declare_parameter('topic_to', 'output')
     node.declare_parameter('topic_from', '/mqtt2ros')
     node.declare_parameter('topic_type', 'std_msgs/String')
     node.declare_parameter('retry_wait', 10)
+    node.declare_parameter('use_gzip_compression', False)
 
     topic_to = node.get_parameter('topic_to').value
     topic_from = node.get_parameter('topic_from').value
     topic_type = node.get_parameter('topic_type').value
     retry_wait = node.get_parameter('retry_wait').value
-
+    use_gzip_compression = node.get_parameter('use_gzip_compression').value
     if topic_type is None:
         node.get_logger().error("topic_type is not specified")
         node.destroy_node()
         rclpy.shutdown()
         return
 
-    # 証明書関連のパラメータ
     node.declare_parameter('cert', '~/.aws/cert/certificate.pem.crt')
     node.declare_parameter('key', '~/.aws/cert/private.pem.key')
     node.declare_parameter('root_ca', '~/.aws/cert/AmazonRootCA1.pem')
@@ -105,7 +117,8 @@ def main(args=None) -> None:
         topic_to,
         topic_type,
         conn_params,
-        retry_wait)
+        retry_wait,
+        use_gzip_compression)
 
     try:
         rclpy.spin(mqtt2ros_node)

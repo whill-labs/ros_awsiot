@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 
+import gzip
+import json
 import logging
 import time
-from os.path import expanduser
 from uuid import uuid4
 
 import rclpy
@@ -15,18 +16,20 @@ from ros_awsiot_agent import set_module_logger
 from ros_awsiot_agent.message_conversion import extract_values
 from rclpy.callback_groups import ReentrantCallbackGroup
 from ros2topic.api import get_msg_class
+from awscrt.mqtt import QoS
+
 
 set_module_logger(modname="awsiotclient", level=logging.DEBUG)
 
 
 class Ros2Mqtt:
     def __init__(
-        self, node: Node, topic_from: str, topic_to: str, msg_type, conn_params: mqtt.ConnectionParams
+        self, node: Node, topic_from: str, topic_to: str, msg_type, conn_params: mqtt.ConnectionParams, use_gzip_compression: bool
     ) -> None:
         self.node = node
-
-        # MQTT接続
+        self.use_gzip_compression = use_gzip_compression
         self.mqtt_connection = mqtt.init(conn_params)
+        self.topic_to = topic_to
         connected = False
         while not connected:
             try:
@@ -39,8 +42,10 @@ class Ros2Mqtt:
                     f"Connection attempt failed: {e}, retrying in 10 seconds...")
                 time.sleep(10)
 
-        self.mqtt_pub = pubsub.Publisher(self.mqtt_connection, topic_to)
+        if not self.use_gzip_compression:
+            self.mqtt_pub = pubsub.Publisher(self.mqtt_connection, topic_to)
 
+        # create ROS2 subscriber
         qos = QoSProfile(depth=10)
         self.sub = self.node.create_subscription(
             msg_type,
@@ -52,13 +57,17 @@ class Ros2Mqtt:
 
     def callback(self, msg) -> None:
         msg_dict = extract_values(msg)
-        self.mqtt_pub.publish(msg_dict)
+        if self.use_gzip_compression:
+            msg_data = gzip.compress(json.dumps(msg_dict).encode('utf-8'))
+            self.mqtt_connection.publish(
+                self.topic_to, msg_data, qos=QoS.AT_LEAST_ONCE)
+        else:
+            self.mqtt_pub.publish(msg_dict)
 
 
 def main(args=None) -> None:
     rclpy.init(args=args)
 
-    # 一つのノードだけを作成
     node = rclpy.create_node(
         'ros2mqtt',
         allow_undeclared_parameters=True)
@@ -72,9 +81,11 @@ def main(args=None) -> None:
     node.declare_parameter('client_id', f'ros2mqtt-{str(uuid4())}')
     node.declare_parameter('signing_region', 'ap-northeast-1')
     node.declare_parameter('use_websocket', False)
+    node.declare_parameter('use_gzip_compression', False)
 
     topic_from = node.get_parameter('topic_from').value
     topic_to = node.get_parameter('topic_to').value
+    use_gzip_compression = node.get_parameter('use_gzip_compression').value
 
     msg_type = get_msg_class(node, topic_from, blocking=True)
     if msg_type is None:
@@ -93,7 +104,13 @@ def main(args=None) -> None:
     conn_params.signing_region = node.get_parameter('signing_region').value
     conn_params.use_websocket = node.get_parameter('use_websocket').value
 
-    Ros2Mqtt(node, topic_from, topic_to, msg_type, conn_params)
+    Ros2Mqtt(
+        node,
+        topic_from,
+        topic_to,
+        msg_type,
+        conn_params,
+        use_gzip_compression)
 
     try:
         rclpy.spin(node)
