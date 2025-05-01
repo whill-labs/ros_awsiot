@@ -38,7 +38,7 @@ def generate_launch_description():
         name='mqtt2ros',
         output='screen',
         parameters=[
-            {'topic_to': '~/output'},
+            {'topic_to': '/output'},
             {'topic_from': EnvironmentVariable('AWSIOT_MQTT_TOPIC')},
             {'topic_type': 'std_msgs/String'},
             {'retry_wait': 10},
@@ -60,14 +60,20 @@ def generate_launch_description():
         package='ros_awsiot_agent',
         executable='talker',
         name='talker',
-        output='screen'
+        output='screen',
+        remappings=[
+            ('/chatter', '/input')
+        ]
     )
 
     listener_node = Node(
         package='ros_awsiot_agent',
         executable='listener',
         name='listener',
-        output='screen'
+        output='screen',
+        remappings=[
+            ('/chatter', '/output')
+        ]
     )
 
     return LaunchDescription([
