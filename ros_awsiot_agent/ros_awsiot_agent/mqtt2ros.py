@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# SPDX-FileCopyrightText: 2025 WHILL Inc.
+# SPDX-License-Identifier: MIT
 
 import logging
 import gzip

@@ -1,4 +1,6 @@
 #!/usr/bin/python3
+# SPDX-FileCopyrightText: 2025 WHILL Inc.
+# SPDX-License-Identifier: MIT
 import logging
 
 default_logging_handler = logging.StreamHandler()
