@@ -47,12 +47,12 @@ def generate_launch_description():
 
 #### Subscribed Topics
 
-- Topic specified by `input_topic` parameter (default: `/input`) (any message type)
+- Topic specified by `input_topic` parameter (default: `~/input`) (any message type)
   : Upstream (ROS2 → AWS IoT) messages. The node converts the contents of this message to JSON and sends it as a "reported" document to the shadow. Note that the message type is determined by the **publisher**.
 
 #### Published Topics
 
-- Topic specified by `output_topic` parameter (default: `/output`) (any message type)
+- Topic specified by `output_topic` parameter (default: `~/output`) (any message type)
   : Downstream (AWS IoT → ROS2) messages. When the node receives a **delta** document from the shadow, the node converts the JSON document to an equivalent ROS2 message and publishes it. Note that the message type is determined by the **subscriber**. If the message structure is not compatible with the received JSON, the node will output an error.
 
 #### Parameters

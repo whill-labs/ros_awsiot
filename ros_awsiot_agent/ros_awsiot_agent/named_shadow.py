@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# SPDX-FileCopyrightText: 2025 WHILL Inc.
+# SPDX-License-Identifier: MIT
 
 import logging
 import time
@@ -47,9 +49,8 @@ class Ros2Shadow(Node):
     ) -> None:
         super().__init__('ros2shadow')
 
-        # Declare parameters
-        self.declare_parameter('input_topic', '/input')
-        self.declare_parameter('output_topic', '/output')
+        self.declare_parameter('input_topic', '~/input')
+        self.declare_parameter('output_topic', '~/output')
         self.declare_parameter('output_topic_type', 'std_msgs/String')
 
         upstream_topic = self.get_parameter('input_topic').value
