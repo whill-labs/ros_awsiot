@@ -6,7 +6,7 @@ This package provides bridge functionalities between ROS2 and AWS IoT.
 
 - Python 3.12++
 - ROS2 Jazzy Jalisco
-- [awsiotclient 0.2.1](https://pypi.org/project/awsiotclient/) (Note: awsiotclient cannot be installed with `rosdep`. Please install it using pip)
+- [awsiotclient 0.2.1](https://pypi.org/project/awsiotclient/)
 
 ## Usage
 
