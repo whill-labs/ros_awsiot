@@ -41,13 +41,19 @@ class Mqtt2Ros:
                 rospy.sleep(retry_wait)
 
         self.pub = rospy.Publisher(topic_to, topic_class, queue_size=10)
-        self.mqtt_sub = pubsub.Subscriber(
-            self.mqtt_connection, topic_from, callback=self.callback
-        )
+        try:
+            self.mqtt_sub = pubsub.Subscriber(
+                self.mqtt_connection, topic_from, callback=self.callback
+            )
+        except Exception as e:
+            rospy.logerr("Failed to subscribe to MQTT topic '%s': %s", topic_from, e)
 
     def callback(self, topic: str, msg_dict: Dict[str, Any]) -> None:
-        msg = populate_instance(msg_dict, self.inst)
-        self.pub.publish(msg)
+        try:
+            msg = populate_instance(msg_dict, self.inst)
+            self.pub.publish(msg)
+        except Exception as e:
+            rospy.logerr("Failed to convert/publish MQTT message to ROS: %s", e)
 
 
 def main() -> None:

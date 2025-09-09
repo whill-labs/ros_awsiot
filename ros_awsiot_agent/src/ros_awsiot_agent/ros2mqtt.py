@@ -34,16 +34,26 @@ class Ros2Mqtt:
             timediff = rospy.Time.now() - now
 
         self.mqtt_connection = mqtt.init(conn_params)
-        connect_future = self.mqtt_connection.connect()
-        connect_future.result()
-        rospy.loginfo("Connected!")
+        connected = False
+        while not connected:
+            try:
+                connect_future = self.mqtt_connection.connect()
+                connect_future.result()
+                rospy.loginfo("Connected to AWS IoT!")
+                connected = True
+            except Exception as e:
+                rospy.logwarn("Connection attempt failed: %s", e)
+                rospy.sleep(10.0)
 
         self.mqtt_pub = pubsub.Publisher(self.mqtt_connection, topic_to)
         self.sub = rospy.Subscriber(topic_from, topic_class, callback=self.callback)
 
     def callback(self, msg: rospy.AnyMsg) -> None:
         msg_dict = extract_values(msg)
-        self.mqtt_pub.publish(msg_dict)
+        try:
+            self.mqtt_pub.publish(msg_dict)
+        except Exception as e:
+            rospy.logerr("Failed to publish to AWS IoT: %s", e)
 
 
 def main() -> None:

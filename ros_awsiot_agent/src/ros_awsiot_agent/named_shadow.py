@@ -89,7 +89,11 @@ class Ros2Shadow:
                 rospy.loginfo("Connected to AWS IoT!")
                 connected = True
             except awscrt.exceptions.AwsCrtError as e:
-                rospy.logwarn("Connection attempt failed: {}, retrying in {} seconds...".format(e, shadow_params.retry_wait))
+                rospy.logwarn(
+                    "Connection attempt failed: %s, retrying in %s seconds...",
+                    e,
+                    shadow_params.retry_wait,
+                )
                 rospy.sleep(shadow_params.retry_wait)
 
         # Publisher must be initialized before delta_func is registerd to shadow client
@@ -133,7 +137,10 @@ class Ros2Shadow:
         )
         downstream_inst = self.downstream_topic_class()
         msg = populate_instance(value, downstream_inst)
-        self.pub.publish(msg)
+        try:
+            self.pub.publish(msg)
+        except Exception as e:
+            rospy.logerr("Failed to publish downstream message: %s", e)
 
     def deny_delta(
         self, thing_name: str, shadow_name: str, value: Dict[str, Any]
@@ -146,7 +153,12 @@ class Ros2Shadow:
 
     def callback(self, msg: rospy.AnyMsg) -> None:
         msg_dict = extract_values(msg)
-        self.shadow_cli.change_reported_value(msg_dict)
+        try:
+            self.shadow_cli.change_reported_value(msg_dict)
+        except awscrt.exceptions.AwsCrtError as e:
+            rospy.logwarn("AWS IoT shadow update failed: %s", e)
+        except Exception as e:
+            rospy.logerr("Unexpected error updating AWS IoT shadow: %s", e)
 
 
 def main() -> None:
