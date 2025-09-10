@@ -20,6 +20,6 @@ def setup_aws_iot_logging():
 
         _awsiot_mqtt.on_connection_interrupted = _ros_on_connection_interrupted  # type: ignore
         _awsiot_mqtt.on_connection_resumed = _ros_on_connection_resumed  # type: ignore
-    except Exception:
-        # Ignore failures here as they are not critical
-        pass
+    except Exception as e:
+        # Ignore failures here as they are not critical, but log for debugging
+        rospy.logdebug('Failed to setup AWS IoT logging: %s', e)
