@@ -8,6 +8,7 @@ from uuid import uuid4
 import rospy
 from awsiotclient import mqtt, named_shadow
 from ros_awsiot_agent import set_module_logger
+from ros_awsiot_agent.mqtt_logging import setup_aws_iot_logging
 from rosbridge_library.internal.message_conversion import (
     extract_values,
     populate_instance,
@@ -15,8 +16,6 @@ from rosbridge_library.internal.message_conversion import (
 from rostopic import ROSTopicIOException, get_topic_class, get_topic_type
 
 import awscrt.exceptions
-
-from .mqtt_logging import setup_aws_iot_logging
 
 set_module_logger(modname="awsiotclient", level=logging.WARN)
 setup_aws_iot_logging()
