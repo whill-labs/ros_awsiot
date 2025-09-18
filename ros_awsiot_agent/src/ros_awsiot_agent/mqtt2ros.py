@@ -26,7 +26,7 @@ class Mqtt2Ros:
         topic_type: str,
         conn_params: mqtt.ConnectionParams,
         retry_wait: float = 10.0,
-        retry: int = 100,
+        max_attempts: int = 100,
     ) -> None:
         topic_class = get_message_class(topic_type)
         self.inst = topic_class()
@@ -34,7 +34,7 @@ class Mqtt2Ros:
 
         connected = False
         attempts = 0
-        while not connected and attempts < retry:
+        while not connected and attempts < max_attempts:
             try:
                 connect_future = self.mqtt_connection.connect()
                 connect_future.result()
@@ -42,12 +42,12 @@ class Mqtt2Ros:
                 connected = True
             except awscrt.exceptions.AwsCrtError as e:
                 attempts += 1
-                rospy.logwarn("Connection attempt %d/%d failed: %s, retrying in %s seconds...", attempts, retry, e, retry_wait)
-                if attempts < retry:
+                rospy.logwarn("Connection attempt %d/%d failed: %s, retrying in %s seconds...", attempts, max_attempts, e, retry_wait)
+                if attempts < max_attempts:
                     rospy.sleep(retry_wait)
 
         if not connected:
-            rospy.logerr("Failed to connect to AWS IoT after %d attempts", retry)
+            rospy.logerr("Failed to connect to AWS IoT after %d attempts", max_attempts)
             raise RuntimeError("AWS IoT connection failed")
 
         self.pub = rospy.Publisher(topic_to, topic_class, queue_size=10)
@@ -85,7 +85,7 @@ def main() -> None:
     topic_from = rospy.get_param("~topic_from", default="/mqtt2ros")
     topic_type = rospy.get_param("~topic_type", default="std_msgs/String")
     retry_wait = rospy.get_param("~retry_wait", default=10.0)
-    retry = rospy.get_param("~retry_attempts", default=100)
+    max_attempts = rospy.get_param("~max_attempts", default=100)
 
     conn_params = mqtt.ConnectionParams()
 
@@ -109,7 +109,7 @@ def main() -> None:
     )
     conn_params.use_websocket = rospy.get_param("~use_websocket", default=False)
 
-    Mqtt2Ros(topic_from, topic_to, topic_type, conn_params, retry_wait, retry)
+    Mqtt2Ros(topic_from, topic_to, topic_type, conn_params, retry_wait, max_attempts)
     rospy.spin()
 
 
