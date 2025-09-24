@@ -8,6 +8,7 @@ from uuid import uuid4
 import rospy
 from awsiotclient import mqtt, named_shadow
 from ros_awsiot_agent import set_module_logger
+from ros_awsiot_agent.mqtt_logging import setup_aws_iot_logging
 from rosbridge_library.internal.message_conversion import (
     extract_values,
     populate_instance,
@@ -17,6 +18,7 @@ from rostopic import ROSTopicIOException, get_topic_class, get_topic_type
 import awscrt.exceptions
 
 set_module_logger(modname="awsiotclient", level=logging.WARN)
+setup_aws_iot_logging()
 
 
 class ShadowParams:
@@ -28,7 +30,8 @@ class ShadowParams:
         enable_upstream: bool = True,
         publish_full_doc: bool = False,
         use_desired_as_downstream: bool = True,
-        retry_wait: int = 10,
+        retry_wait: float = 10.0,
+        retry: int = 100,
     ) -> None:
         self.thing_name = thing_name
         self.name = name
@@ -37,6 +40,7 @@ class ShadowParams:
         self.publish_full_doc = publish_full_doc
         self.use_desired_as_downstream = use_desired_as_downstream
         self.retry_wait = retry_wait
+        self.retry = retry
 
 
 class Ros2Shadow:
@@ -82,15 +86,28 @@ class Ros2Shadow:
 
         self.mqtt_connection = mqtt.init(conn_params)
         connected = False
-        while not connected:
+        attempts = 0
+        while not connected and attempts < shadow_params.retry:
             try:
                 connect_future = self.mqtt_connection.connect()
                 connect_future.result()
                 rospy.loginfo("Connected to AWS IoT!")
                 connected = True
             except awscrt.exceptions.AwsCrtError as e:
-                rospy.logwarn("Connection attempt failed: {}, retrying in {} seconds...".format(e, shadow_params.retry_wait))
-                rospy.sleep(shadow_params.retry_wait)
+                attempts += 1
+                rospy.logwarn(
+                    "AWS IoT connection attempt %d/%d failed: %s, retrying in %s seconds...",
+                    attempts,
+                    shadow_params.retry,
+                    e,
+                    shadow_params.retry_wait,
+                )
+                if attempts < shadow_params.retry:
+                    rospy.sleep(shadow_params.retry_wait)
+
+        if not connected:
+            rospy.logerr("Failed to connect to AWS IoT after %d attempts", shadow_params.retry)
+            raise RuntimeError("AWS IoT connection failed")
 
         # Publisher must be initialized before delta_func is registerd to shadow client
         if downstream_topic_class:
@@ -126,14 +143,21 @@ class Ros2Shadow:
         self, thing_name: str, shadow_name: str, value: Dict[str, Any]
     ) -> None:
         rospy.logdebug(
-            f"cb invoked. thing_name: {thing_name}, shadow_name: {shadow_name}"
+            "cb invoked. thing_name: %s, shadow_name: %s", thing_name, shadow_name
         )
-        rospy.logdebug(
-            f"value: {value}"
-        )
-        downstream_inst = self.downstream_topic_class()
-        msg = populate_instance(value, downstream_inst)
-        self.pub.publish(msg)
+        rospy.logdebug("value: %s", value)
+
+        try:
+            downstream_inst = self.downstream_topic_class()
+            msg = populate_instance(value, downstream_inst)
+        except Exception as e:
+            rospy.logerr("Failed to create downstream message from shadow value: %s", e)
+            return
+
+        try:
+            self.pub.publish(msg)
+        except Exception as e:
+            rospy.logerr("Failed to publish downstream message: %s", e)
 
     def deny_delta(
         self, thing_name: str, shadow_name: str, value: Dict[str, Any]
@@ -145,8 +169,18 @@ class Ros2Shadow:
         )
 
     def callback(self, msg: rospy.AnyMsg) -> None:
-        msg_dict = extract_values(msg)
-        self.shadow_cli.change_reported_value(msg_dict)
+        try:
+            msg_dict = extract_values(msg)
+        except Exception as e:
+            rospy.logerr("Failed to extract values from ROS message: %s", e)
+            return
+
+        try:
+            self.shadow_cli.change_reported_value(msg_dict)
+        except awscrt.exceptions.AwsCrtError as e:
+            rospy.logerr("AWS IoT shadow update failed: %s", e)
+        except Exception as e:
+            rospy.logerr("Unexpected error updating AWS IoT shadow: %s", e)
 
 
 def main() -> None:
@@ -161,7 +195,8 @@ def main() -> None:
         "~enable_downstream", default=False
     )
     shadow_params.enable_upstream = rospy.get_param("~enable_upstream", default=True)
-    shadow_params.retry_wait = rospy.get_param("~retry_wait", default=10)
+    shadow_params.retry_wait = rospy.get_param("~retry_wait", default=10.0)
+    shadow_params.retry = rospy.get_param("~retry_attempts", default=100)
 
     conn_params = mqtt.ConnectionParams()
 

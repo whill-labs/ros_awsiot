@@ -6,16 +6,25 @@ from uuid import uuid4
 
 import rospy
 from awsiotclient import mqtt, pubsub
+import awscrt.exceptions
 from ros_awsiot_agent import set_module_logger
+from ros_awsiot_agent.mqtt_logging import setup_aws_iot_logging
 from rosbridge_library.internal.message_conversion import extract_values
 from rostopic import ROSTopicIOException, get_topic_class, get_topic_type
 
+
 set_module_logger(modname="awsiotclient", level=logging.WARN)
+setup_aws_iot_logging()
 
 
 class Ros2Mqtt:
     def __init__(
-        self, topic_from: str, topic_to: str, conn_params: mqtt.ConnectionParams
+        self,
+        topic_from: str,
+        topic_to: str,
+        conn_params: mqtt.ConnectionParams,
+        retry_wait: float = 10.0,
+        max_attempts: int = 100,
     ) -> None:
         topic_class = None
         now = rospy.Time.now()
@@ -34,16 +43,47 @@ class Ros2Mqtt:
             timediff = rospy.Time.now() - now
 
         self.mqtt_connection = mqtt.init(conn_params)
-        connect_future = self.mqtt_connection.connect()
-        connect_future.result()
-        rospy.loginfo("Connected!")
+        connected = False
+        attempts = 0
+        while not connected and attempts < max_attempts:
+            try:
+                connect_future = self.mqtt_connection.connect()
+                connect_future.result()
+                rospy.loginfo("Connected to AWS IoT!")
+                connected = True
+            except awscrt.exceptions.AwsCrtError as e:
+                attempts += 1
+                rospy.logwarn("AWS IoT connection attempt %d/%d failed: %s, retrying in %s seconds...", attempts, max_attempts, e, retry_wait)
+                if attempts < max_attempts:
+                    rospy.sleep(retry_wait)
+            except Exception as e:
+                attempts += 1
+                rospy.logerr("Unexpected connection error %d/%d: %s, retrying in %s seconds...", attempts, max_attempts, e, retry_wait)
+                if attempts < max_attempts:
+                    rospy.sleep(retry_wait)
+
+        if not connected:
+            rospy.logerr("Failed to connect to AWS IoT after %d attempts", max_attempts)
+            raise RuntimeError("AWS IoT connection failed")
 
         self.mqtt_pub = pubsub.Publisher(self.mqtt_connection, topic_to)
         self.sub = rospy.Subscriber(topic_from, topic_class, callback=self.callback)
 
     def callback(self, msg: rospy.AnyMsg) -> None:
-        msg_dict = extract_values(msg)
-        self.mqtt_pub.publish(msg_dict)
+        try:
+            msg_dict = extract_values(msg)
+        except Exception as e:
+            rospy.logerr("Failed to extract values from ROS message: %s", e)
+            return
+
+        try:
+            self.mqtt_pub.publish(msg_dict)
+        except awscrt.exceptions.AwsCrtError as e:
+            rospy.logerr("AWS IoT publish failed: %s", e)
+        except (TypeError, ValueError) as e:
+            rospy.logerr("Invalid message format for MQTT publish: %s", e)
+        except Exception as e:
+            rospy.logerr("Unexpected error publishing to AWS IoT: %s", e)
 
 
 def main() -> None:
@@ -74,7 +114,10 @@ def main() -> None:
     )
     conn_params.use_websocket = rospy.get_param("~use_websocket", default=False)
 
-    Ros2Mqtt(topic_from, topic_to, conn_params)
+    retry_wait = rospy.get_param("~retry_wait", default=10.0)
+    max_attempts = rospy.get_param("~max_attempts", default=100)
+
+    Ros2Mqtt(topic_from, topic_to, conn_params, retry_wait, max_attempts)
     rospy.spin()
 
 
