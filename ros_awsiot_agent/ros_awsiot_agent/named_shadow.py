@@ -35,6 +35,7 @@ class ShadowParams:
         publish_full_doc: bool = False,
         use_desired_as_downstream: bool = True,
         retry_wait: int = 10,
+        retry: int = 100,
     ) -> None:
         self.thing_name = thing_name
         self.name = name
@@ -43,6 +44,7 @@ class ShadowParams:
         self.publish_full_doc = publish_full_doc
         self.use_desired_as_downstream = use_desired_as_downstream
         self.retry_wait = retry_wait
+        self.retry = retry
 
 
 class Ros2Shadow(Node):
@@ -80,16 +82,25 @@ class Ros2Shadow(Node):
 
         self.mqtt_connection = mqtt.init(conn_params)
         connected = False
-        while not connected:
+        attempts = 0
+        while not connected and attempts < shadow_params.retry:
             try:
                 connect_future = self.mqtt_connection.connect()
                 connect_future.result()
                 self.get_logger().info("Connected to AWS IoT!")
                 connected = True
             except awscrt.exceptions.AwsCrtError as e:
+                attempts += 1
                 self.get_logger().warn(
-                    f"Connection attempt failed: {e}, retrying in {shadow_params.retry_wait} seconds...")
-                time.sleep(shadow_params.retry_wait)
+                    f"AWS IoT connection attempt {attempts}/{shadow_params.retry} failed: "
+                    f"{e}, retrying in {shadow_params.retry_wait} seconds...")
+                if attempts < shadow_params.retry:
+                    time.sleep(shadow_params.retry_wait)
+
+        if not connected:
+            self.get_logger().error(
+                f"Failed to connect to AWS IoT after {shadow_params.retry} attempts")
+            raise RuntimeError("AWS IoT connection failed")
 
         # Initialize Publisher
         if downstream_topic_class:
@@ -213,9 +224,17 @@ class Ros2Shadow(Node):
         self.get_logger().debug(
             f"value: {value}"
         )
-        downstream_inst = self.downstream_topic_class()
-        msg = populate_instance(value, downstream_inst)
-        self.pub.publish(msg)
+        try:
+            downstream_inst = self.downstream_topic_class()
+            msg = populate_instance(value, downstream_inst)
+        except Exception as e:
+            self.get_logger().error(
+                f"Failed to create downstream message from shadow value: {e}")
+            return
+        try:
+            self.pub.publish(msg)
+        except Exception as e:
+            self.get_logger().error(f"Failed to publish downstream message: {e}")
 
     def deny_delta(
         self, thing_name: str, shadow_name: str, value: Dict[str, Any]
@@ -227,8 +246,19 @@ class Ros2Shadow(Node):
         )
 
     def callback(self, msg) -> None:
-        msg_dict = extract_values(msg)
-        self.shadow_cli.change_reported_value(msg_dict)
+        try:
+            msg_dict = extract_values(msg)
+        except Exception as e:
+            self.get_logger().error(
+                f"Failed to extract values from ROS message: {e}")
+            return
+        try:
+            self.shadow_cli.change_reported_value(msg_dict)
+        except awscrt.exceptions.AwsCrtError as e:
+            self.get_logger().error(f"AWS IoT shadow update failed: {e}")
+        except Exception as e:
+            self.get_logger().error(
+                f"Unexpected error updating AWS IoT shadow: {e}")
 
 
 def main(args=None) -> None:
@@ -243,6 +273,7 @@ def main(args=None) -> None:
     node.declare_parameter('enable_downstream', False)
     node.declare_parameter('enable_upstream', True)
     node.declare_parameter('retry_wait', 10)
+    node.declare_parameter('retry_attempts', 100)
     node.declare_parameter('cert', '~/.aws/cert/certificate.pem.crt')
     node.declare_parameter('key', '~/.aws/cert/private.pem.key')
     node.declare_parameter('root_ca', '~/.aws/cert/AmazonRootCA1.pem')
@@ -260,6 +291,7 @@ def main(args=None) -> None:
         'enable_downstream').value
     shadow_params.enable_upstream = node.get_parameter('enable_upstream').value
     shadow_params.retry_wait = node.get_parameter('retry_wait').value
+    shadow_params.retry = node.get_parameter('retry_attempts').value
 
     conn_params = mqtt.ConnectionParams()
     conn_params.cert = expanduser(node.get_parameter('cert').value)
