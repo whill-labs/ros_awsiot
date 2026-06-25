@@ -14,12 +14,14 @@ import rclpy
 from rclpy.node import Node
 from awsiotclient import mqtt, pubsub
 from ros_awsiot_agent import set_module_logger
+from ros_awsiot_agent.mqtt_logging import setup_aws_iot_logging
 from rosidl_runtime_py.utilities import get_message
 import awscrt.exceptions
 from awscrt.mqtt import QoS
 from ros_awsiot_agent.message_conversion import populate_instance
 
 set_module_logger(modname="awsiotclient", level=logging.WARN)
+setup_aws_iot_logging()
 
 
 class Mqtt2Ros(Node):

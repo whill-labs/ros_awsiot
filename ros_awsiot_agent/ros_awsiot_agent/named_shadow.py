@@ -13,6 +13,7 @@ import awscrt.exceptions
 import rclpy
 from rclpy.node import Node
 from ros_awsiot_agent import set_module_logger
+from ros_awsiot_agent.mqtt_logging import setup_aws_iot_logging
 from rosbridge_library.internal.message_conversion import (
     extract_values,
     populate_instance,
@@ -21,6 +22,7 @@ from ros2topic.api import get_msg_class
 
 
 set_module_logger(modname="awsiotclient", level=logging.WARN)
+setup_aws_iot_logging()
 
 
 class ShadowParams:

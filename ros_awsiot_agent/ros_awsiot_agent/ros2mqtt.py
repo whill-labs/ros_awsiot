@@ -15,6 +15,7 @@ from rclpy.qos import QoSProfile
 from awsiotclient import mqtt, pubsub
 import awscrt.exceptions
 from ros_awsiot_agent import set_module_logger
+from ros_awsiot_agent.mqtt_logging import setup_aws_iot_logging
 from ros_awsiot_agent.message_conversion import extract_values
 from rclpy.callback_groups import ReentrantCallbackGroup
 from ros2topic.api import get_msg_class
@@ -22,6 +23,7 @@ from awscrt.mqtt import QoS
 
 
 set_module_logger(modname="awsiotclient", level=logging.DEBUG)
+setup_aws_iot_logging()
 
 
 class Ros2Mqtt:
