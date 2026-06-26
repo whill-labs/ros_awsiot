@@ -26,6 +26,12 @@ def setup_aws_iot_logging():
         logger.debug(f"Failed to setup AWS IoT logging: {e}")
         return
 
+    # Apply once per process. Capturing the original callback again after
+    # patching would make the resumed wrapper delegate to itself (infinite
+    # recursion), so guard with a sentinel on the module.
+    if getattr(_awsiot_mqtt, "_ros_logging_patched", False):
+        return
+
     # Keep the default callback to preserve its resubscribe handling
     # (resubscribe when the session is not persisted on resume).
     _default_on_connection_resumed = _awsiot_mqtt.on_connection_resumed
@@ -43,3 +49,4 @@ def setup_aws_iot_logging():
 
     _awsiot_mqtt.on_connection_interrupted = _ros_on_connection_interrupted
     _awsiot_mqtt.on_connection_resumed = _ros_on_connection_resumed
+    _awsiot_mqtt._ros_logging_patched = True

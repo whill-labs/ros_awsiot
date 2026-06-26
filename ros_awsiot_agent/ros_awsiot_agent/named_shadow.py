@@ -91,11 +91,14 @@ class Ros2Shadow(Node):
                 connected = True
             except awscrt.exceptions.AwsCrtError as e:
                 attempts += 1
-                self.get_logger().warn(
-                    f"AWS IoT connection attempt {attempts}/{shadow_params.retry} failed: "
-                    f"{e}, retrying in {shadow_params.retry_wait} seconds...")
                 if attempts < shadow_params.retry:
+                    self.get_logger().warn(
+                        f"AWS IoT connection attempt {attempts}/{shadow_params.retry} failed: "
+                        f"{e}, retrying in {shadow_params.retry_wait} seconds...")
                     time.sleep(shadow_params.retry_wait)
+                else:
+                    self.get_logger().warn(
+                        f"AWS IoT connection attempt {attempts}/{shadow_params.retry} failed: {e}")
 
         if not connected:
             self.get_logger().error(

@@ -44,18 +44,24 @@ class Ros2Mqtt:
                 connected = True
             except awscrt.exceptions.AwsCrtError as e:
                 attempts += 1
-                self.node.get_logger().warn(
-                    f"AWS IoT connection attempt {attempts}/{max_attempts} failed: "
-                    f"{e}, retrying in {retry_wait} seconds...")
                 if attempts < max_attempts:
+                    self.node.get_logger().warn(
+                        f"AWS IoT connection attempt {attempts}/{max_attempts} failed: "
+                        f"{e}, retrying in {retry_wait} seconds...")
                     time.sleep(retry_wait)
+                else:
+                    self.node.get_logger().warn(
+                        f"AWS IoT connection attempt {attempts}/{max_attempts} failed: {e}")
             except Exception as e:
                 attempts += 1
-                self.node.get_logger().error(
-                    f"Unexpected connection error {attempts}/{max_attempts}: "
-                    f"{e}, retrying in {retry_wait} seconds...")
                 if attempts < max_attempts:
+                    self.node.get_logger().error(
+                        f"Unexpected connection error {attempts}/{max_attempts}: "
+                        f"{e}, retrying in {retry_wait} seconds...")
                     time.sleep(retry_wait)
+                else:
+                    self.node.get_logger().error(
+                        f"Unexpected connection error {attempts}/{max_attempts}: {e}")
 
         if not connected:
             self.node.get_logger().error(
@@ -128,7 +134,7 @@ def main(args=None) -> None:
     msg_type = get_msg_class(node, topic_from, blocking=True)
     if msg_type is None:
         node.get_logger().error(
-            f"Could not determine message type for {topic_from} after {timeout} seconds")
+            f"Could not determine message type for {topic_from}")
         node.destroy_node()
         rclpy.shutdown()
         return

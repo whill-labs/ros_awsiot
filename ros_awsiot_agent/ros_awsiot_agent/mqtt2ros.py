@@ -51,11 +51,14 @@ class Mqtt2Ros(Node):
                 connected = True
             except awscrt.exceptions.AwsCrtError as e:
                 attempts += 1
-                self.get_logger().warn(
-                    f"AWS IoT connection attempt {attempts}/{max_attempts} failed: "
-                    f"{e}, retrying in {retry_wait} seconds...")
                 if attempts < max_attempts:
+                    self.get_logger().warn(
+                        f"AWS IoT connection attempt {attempts}/{max_attempts} failed: "
+                        f"{e}, retrying in {retry_wait} seconds...")
                     time.sleep(retry_wait)
+                else:
+                    self.get_logger().warn(
+                        f"AWS IoT connection attempt {attempts}/{max_attempts} failed: {e}")
 
         if not connected:
             self.get_logger().error(
