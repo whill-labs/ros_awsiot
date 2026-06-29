@@ -15,6 +15,7 @@ from rclpy.qos import QoSProfile
 from awsiotclient import mqtt, pubsub
 import awscrt.exceptions
 from ros_awsiot_agent import set_module_logger
+from ros_awsiot_agent.mqtt_logging import setup_aws_iot_logging
 from ros_awsiot_agent.message_conversion import extract_values
 from rclpy.callback_groups import ReentrantCallbackGroup
 from ros2topic.api import get_msg_class
@@ -22,27 +23,50 @@ from awscrt.mqtt import QoS
 
 
 set_module_logger(modname="awsiotclient", level=logging.DEBUG)
+setup_aws_iot_logging()
 
 
 class Ros2Mqtt:
     def __init__(
-        self, node: Node, topic_from: str, topic_to: str, msg_type, conn_params: mqtt.ConnectionParams, use_gzip_compression: bool
+        self, node: Node, topic_from: str, topic_to: str, msg_type, conn_params: mqtt.ConnectionParams, use_gzip_compression: bool, retry_wait: int = 10, max_attempts: int = 100
     ) -> None:
         self.node = node
         self.use_gzip_compression = use_gzip_compression
         self.mqtt_connection = mqtt.init(conn_params)
         self.topic_to = topic_to
         connected = False
-        while not connected:
+        attempts = 0
+        while not connected and attempts < max_attempts:
             try:
                 connect_future = self.mqtt_connection.connect()
                 connect_future.result()
                 self.node.get_logger().info("Connected to AWS IoT!")
                 connected = True
             except awscrt.exceptions.AwsCrtError as e:
-                self.node.get_logger().warn(
-                    f"Connection attempt failed: {e}, retrying in 10 seconds...")
-                time.sleep(10)
+                attempts += 1
+                if attempts < max_attempts:
+                    self.node.get_logger().warn(
+                        f"AWS IoT connection attempt {attempts}/{max_attempts} failed: "
+                        f"{e}, retrying in {retry_wait} seconds...")
+                    time.sleep(retry_wait)
+                else:
+                    self.node.get_logger().warn(
+                        f"AWS IoT connection attempt {attempts}/{max_attempts} failed: {e}")
+            except Exception as e:
+                attempts += 1
+                if attempts < max_attempts:
+                    self.node.get_logger().error(
+                        f"Unexpected connection error {attempts}/{max_attempts}: "
+                        f"{e}, retrying in {retry_wait} seconds...")
+                    time.sleep(retry_wait)
+                else:
+                    self.node.get_logger().error(
+                        f"Unexpected connection error {attempts}/{max_attempts}: {e}")
+
+        if not connected:
+            self.node.get_logger().error(
+                f"Failed to connect to AWS IoT after {max_attempts} attempts")
+            raise RuntimeError("AWS IoT connection failed")
 
         if not self.use_gzip_compression:
             self.mqtt_pub = pubsub.Publisher(self.mqtt_connection, topic_to)
@@ -58,13 +82,27 @@ class Ros2Mqtt:
         )
 
     def callback(self, msg) -> None:
-        msg_dict = extract_values(msg)
-        if self.use_gzip_compression:
-            msg_data = gzip.compress(json.dumps(msg_dict).encode('utf-8'))
-            self.mqtt_connection.publish(
-                self.topic_to, msg_data, qos=QoS.AT_LEAST_ONCE)
-        else:
-            self.mqtt_pub.publish(msg_dict)
+        try:
+            msg_dict = extract_values(msg)
+        except Exception as e:
+            self.node.get_logger().error(
+                f"Failed to extract values from ROS message: {e}")
+            return
+        try:
+            if self.use_gzip_compression:
+                msg_data = gzip.compress(json.dumps(msg_dict).encode('utf-8'))
+                self.mqtt_connection.publish(
+                    self.topic_to, msg_data, qos=QoS.AT_LEAST_ONCE)
+            else:
+                self.mqtt_pub.publish(msg_dict)
+        except awscrt.exceptions.AwsCrtError as e:
+            self.node.get_logger().error(f"AWS IoT publish failed: {e}")
+        except (TypeError, ValueError) as e:
+            self.node.get_logger().error(
+                f"Invalid message format for MQTT publish: {e}")
+        except Exception as e:
+            self.node.get_logger().error(
+                f"Unexpected error publishing to AWS IoT: {e}")
 
 
 def main(args=None) -> None:
@@ -84,15 +122,19 @@ def main(args=None) -> None:
     node.declare_parameter('signing_region', 'ap-northeast-1')
     node.declare_parameter('use_websocket', False)
     node.declare_parameter('use_gzip_compression', False)
+    node.declare_parameter('retry_wait', 10)
+    node.declare_parameter('max_attempts', 100)
 
     topic_from = node.get_parameter('topic_from').value
     topic_to = node.get_parameter('topic_to').value
     use_gzip_compression = node.get_parameter('use_gzip_compression').value
+    retry_wait = node.get_parameter('retry_wait').value
+    max_attempts = node.get_parameter('max_attempts').value
 
     msg_type = get_msg_class(node, topic_from, blocking=True)
     if msg_type is None:
         node.get_logger().error(
-            f"Could not determine message type for {topic_from} after {timeout} seconds")
+            f"Could not determine message type for {topic_from}")
         node.destroy_node()
         rclpy.shutdown()
         return
@@ -112,7 +154,9 @@ def main(args=None) -> None:
         topic_to,
         msg_type,
         conn_params,
-        use_gzip_compression)
+        use_gzip_compression,
+        retry_wait,
+        max_attempts)
 
     try:
         rclpy.spin(node)
