@@ -22,7 +22,7 @@ from ros2topic.api import get_msg_class
 from awscrt.mqtt import QoS
 
 
-set_module_logger(modname="awsiotclient", level=logging.DEBUG)
+set_module_logger(modname="awsiotclient", level=logging.WARN)
 setup_aws_iot_logging()
 
 
